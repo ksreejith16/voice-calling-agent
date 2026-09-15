@@ -1,0 +1,35 @@
+{
+  "name": "india-voice-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-tenant India voice platform — Phase 1 foundation",
+  "engines": {
+    "node": ">=22.12.0 <23 || >=24.0.0",
+    "npm": ">=10"
+  },
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "packages/database"
+  ],
+  "scripts": {
+    "build": "npm run build -w @india-voice/database && npm run build -w @india-voice/api && npm run build -w @india-voice/web",
+    "typecheck": "npm run build -w @india-voice/database && npm run typecheck --workspaces",
+    "dev": "npm run build -w @india-voice/database && concurrently -k -n api,web \"npm run dev -w @india-voice/api\" \"npm run dev -w @india-voice/web\"",
+    "dev:api": "npm run build -w @india-voice/database && npm run dev -w @india-voice/api",
+    "dev:web": "npm run dev -w @india-voice/web",
+    "db:generate": "npm run db:generate -w @india-voice/database",
+    "db:migrate": "npm run db:migrate -w @india-voice/database",
+    "infra:up": "docker compose --env-file .env -f infra/compose.yaml up -d --wait",
+    "infra:down": "docker compose --env-file .env -f infra/compose.yaml down",
+    "test": "npm run build -w @india-voice/database && npm run test -w @india-voice/database && npm run test -w @india-voice/api",
+    "test:database": "node --env-file-if-exists=.env --test tests/database.integration.test.cjs",
+    "test:smoke": "node --env-file-if-exists=.env --test tests/smoke.test.cjs",
+    "verify": "npm run typecheck && npm run build && npm test && npm run test:database && npm run test:smoke"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.2",
+    "concurrently": "10.0.5",
+    "typescript": "5.9.3"
+  }
+}

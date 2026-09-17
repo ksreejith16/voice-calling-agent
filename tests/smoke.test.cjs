@@ -49,9 +49,9 @@ test('built API and Next.js start and serve real health, readiness, overview and
     web = start([path.resolve('node_modules/next/dist/bin/next'), 'start', '--hostname', '127.0.0.1', '--port', String(webPort)], path.resolve('apps/web'), { NODE_ENV: 'production', API_INTERNAL_URL: apiUrl });
     const overview = await waitFor(webUrl, web);
     const html = await overview.text();
-    assert.match(html, /Your workspace starts here/);
-    assert.match(html, /Responding/);
-    assert.match(html, /Awaiting review/);
+    assert.match(html, /Call more leads/);
+    assert.match(html, /In their language/);
+    assert.match(html, /Real Estate/);
     assert.doesNotMatch(html, /local_app_only|local_migrator_only|postgresql:\/\//);
     const setup = await fetch(`${webUrl}/setup`);
     assert.equal(setup.status, 200);

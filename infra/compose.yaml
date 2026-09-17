@@ -31,17 +31,22 @@ services:
       timeout: 3s
       retries: 30
   livekit:
-    image: livekit/livekit-server:latest
+    # Pin to a specific version; "latest" can break a working setup silently.
+    image: livekit/livekit-server:v1.8.0
     command:
       - "--dev"
       - "--bind"
       - "0.0.0.0"
+      # Advertise loopback so ICE candidates are reachable from the same machine.
+      - "--node-ip=127.0.0.1"
+      # Use a single fixed UDP port for WebRTC media (easier to expose in Docker).
+      - "--rtc.udp_port=7882"
       - "--keys"
       - "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-devsecret-which-must-be-at-least-32-chars}"
-    environment:
-      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-devsecret-which-must-be-at-least-32-chars}"
     ports:
       - "127.0.0.1:${LIVEKIT_PORT:-7880}:7880"
+      # WebRTC media transport — required for audio to flow; signaling alone is not enough.
+      - "127.0.0.1:7882:7882/udp"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:7880 || exit 1"]
       interval: 5s

@@ -13,6 +13,7 @@ import logging
 import uuid
 from pathlib import Path
 
+import httpx
 from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, cli
 from livekit.plugins import openai as oai_plugin
 from livekit.plugins import sarvam, silero
@@ -33,89 +34,105 @@ class IndiaVoiceAgent(Agent):
                 model=settings.llm_model,
                 api_key=settings.llm_api_key.get_secret_value(),
                 base_url=settings.llm_base_url,
+                # Enforce provider timeout so a slow LLM cannot stall the pipeline.
+                timeout=httpx.Timeout(settings.voice_provider_timeout_seconds),
+                # Approximate the character budget as a token ceiling.
+                # ~3 chars/token is conservative for mixed-script Indian text.
+                max_completion_tokens=settings.voice_max_output_characters // 3,
             ),
         )
 
 
-def _make_entrypoint(settings: Settings):
-    """Return a per-job entrypoint bound to validated settings.
+async def entrypoint(ctx: JobContext) -> None:
+    """Per-session entrypoint.
 
-    Using a factory keeps settings validated once in main() and avoids
-    re-reading environment variables on every dispatch.
+    Defined at module level so the SDK can pickle it for process-based job
+    execution on Linux/macOS. Closures returned by a factory cannot be pickled
+    and will fail under the default multiprocessing executor on those platforms.
+    Windows uses threads (the installed SDK default), so the closure would have
+    worked there, but this form is portable.
     """
+    settings = Settings.from_env()
 
-    async def entrypoint(ctx: JobContext) -> None:
-        metrics_dir = Path(settings.voice_metrics_directory)
-        recorder = Recorder(metrics_dir / f"session-{uuid.uuid4().hex}.jsonl")
+    metrics_dir = Path(settings.voice_metrics_directory)
+    recorder = Recorder(metrics_dir / f"session-{uuid.uuid4().hex}.jsonl")
 
-        # Register cleanup to run when the LiveKit job ends.
-        async def _on_shutdown() -> None:
-            recorder.close()
+    async def _on_shutdown() -> None:
+        recorder.close()
 
-        ctx.add_shutdown_callback(_on_shutdown)
+    ctx.add_shutdown_callback(_on_shutdown)
 
-        await ctx.connect()
+    await ctx.connect()
 
-        session = AgentSession(
-            # Silero VAD runs locally via ONNX at 16 kHz; the SDK resamples
-            # browser WebRTC audio (48 kHz) to the required 16 kHz input rate.
-            vad=silero.VAD.load(sample_rate=16000),
-            # Sarvam realtime STT — must use STTRealtime, not the legacy STT.
-            stt=sarvam.STTRealtime(
-                language=settings.sarvam_stt_language,
-                stream_type=settings.sarvam_stt_stream_type,
-                mode=settings.sarvam_stt_mode,
-                api_key=settings.sarvam_api_key.get_secret_value(),
-            ),
-            # Sarvam streaming TTS — bulbul:v3 with the configured voice.
-            tts=sarvam.TTS(
-                model="bulbul:v3",
-                target_language_code=settings.sarvam_tts_language,
-                speaker=settings.sarvam_tts_speaker,
-                pace=settings.sarvam_tts_pace,
-                temperature=settings.sarvam_tts_temperature,
-                api_key=settings.sarvam_api_key.get_secret_value(),
-            ),
-            turn_handling={
-                # min_delay is the silence window before committing an utterance.
-                "endpointing": {
-                    "min_delay": settings.voice_endpoint_silence_ms / 1000.0,
-                },
-                # Disable false-interruption resumption: once the old generation
-                # is cancelled, its audio must never resume (guards.py epoch check).
-                "interruption": {
-                    "enabled": True,
-                    "resume_false_interruption": False,
-                    "min_duration": settings.voice_interruption_ms / 1000.0,
-                },
+    session = AgentSession(
+        # Silero VAD: pass the configured silence threshold explicitly.
+        # The SDK default is 550 ms; this application is configured for 180 ms.
+        vad=silero.VAD.load(
+            sample_rate=16000,
+            min_silence_duration=settings.voice_endpoint_silence_ms / 1000.0,
+        ),
+        # Sarvam realtime STT — must use STTRealtime, not the legacy STT class.
+        stt=sarvam.STTRealtime(
+            language=settings.sarvam_stt_language,
+            stream_type=settings.sarvam_stt_stream_type,
+            mode=settings.sarvam_stt_mode,
+            api_key=settings.sarvam_api_key.get_secret_value(),
+        ),
+        # Sarvam streaming TTS — bulbul:v3 with the configured voice.
+        tts=sarvam.TTS(
+            model="bulbul:v3",
+            target_language_code=settings.sarvam_tts_language,
+            speaker=settings.sarvam_tts_speaker,
+            pace=settings.sarvam_tts_pace,
+            temperature=settings.sarvam_tts_temperature,
+            api_key=settings.sarvam_api_key.get_secret_value(),
+        ),
+        # The SDK's 3-second AEC warm-up suppresses audio-triggered interruptions.
+        # Set to 0: browser WebRTC has its own echo cancellation; we do not need it.
+        aec_warmup_duration=0,
+        turn_handling={
+            # Use VAD-based turn detection driven by the Silero instance above.
+            "turn_detection": "vad",
+            "endpointing": {
+                # Minimum silence before committing the user's turn (from config).
+                "min_delay": settings.voice_endpoint_silence_ms / 1000.0,
+                # Hard ceiling on silence wait; prevents indefinitely open turns.
+                "max_delay": min(settings.voice_turn_timeout_seconds, 10.0),
             },
-        )
+            # Bound the maximum wall-clock duration of a single user utterance.
+            "user_turn_limit": {
+                "max_duration": settings.voice_max_input_seconds,
+            },
+            "interruption": {
+                "enabled": True,
+                # Use VAD for interruption detection, not the ML adaptive detector.
+                # The adaptive detector adds latency and is not required here.
+                "mode": "vad",
+                # Never resume a cancelled generation — old audio must stay cancelled.
+                "resume_false_interruption": False,
+                "min_duration": settings.voice_interruption_ms / 1000.0,
+            },
+        },
+    )
 
-        # Wire internal timing events to the JSONL recorder.
-        @session.on("metrics_collected")
-        def _on_metrics(event) -> None:
-            recorder.on_metrics(event.metrics)
+    @session.on("metrics_collected")
+    def _on_metrics(event) -> None:
+        recorder.on_metrics(event.metrics)
 
-        @session.on("conversation_item_added")
-        def _on_item(event) -> None:
-            recorder.on_conversation_item(event.item)
+    @session.on("conversation_item_added")
+    def _on_item(event) -> None:
+        recorder.on_conversation_item(event.item)
 
-        async def _enforce_session_ttl() -> None:
-            """Close the session after the configured maximum duration."""
-            await asyncio.sleep(settings.voice_session_seconds)
-            LOGGER.info(
-                "Session TTL reached (%ds); closing.", settings.voice_session_seconds
-            )
-            await session.aclose()
+    async def _enforce_session_ttl() -> None:
+        await asyncio.sleep(settings.voice_session_seconds)
+        LOGGER.info("Session TTL reached (%ds); closing.", settings.voice_session_seconds)
+        await session.aclose()
 
-        # The TTL task outlives entrypoint() — asyncio tasks are not cancelled
-        # when the creating coroutine returns. The shutdown callback above
-        # handles recorder cleanup; aclose() on a finished session is a no-op.
-        asyncio.create_task(_enforce_session_ttl(), name="session-ttl")
+    # Task outlives entrypoint() — asyncio tasks are not cancelled when the
+    # creating coroutine returns. aclose() on an already-closed session is a no-op.
+    asyncio.create_task(_enforce_session_ttl(), name="session-ttl")
 
-        await session.start(agent=IndiaVoiceAgent(settings), room=ctx.room)
-
-    return entrypoint
+    await session.start(agent=IndiaVoiceAgent(settings), room=ctx.room)
 
 
 def main() -> None:
@@ -129,7 +146,7 @@ def main() -> None:
 
     cli.run_app(
         WorkerOptions(
-            entrypoint_fnc=_make_entrypoint(settings),
+            entrypoint_fnc=entrypoint,
             agent_name=settings.voice_agent_name,
             ws_url=settings.livekit_url,
             api_key=settings.livekit_api_key.get_secret_value(),

@@ -1,0 +1,4 @@
+[console_scripts]
+india-voice-browser = india_voice.browser:main
+india-voice-report = india_voice.telemetry:main
+india-voice-worker = india_voice.worker:main

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>India Voice · Browser test</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/vendor/livekit-client.umd.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header><a class="brand" href="/">◖ India Voice</a><span class="tag">LOCAL VOICE PROTOTYPE</span></header>
+  <main>
+    <section class="intro"><p class="eyebrow">BROWSER CONVERSATION TEST</p><h1>Let’s hear how it sounds.</h1><p>Use your microphone to try a conversation with the named LiveKit agent. Keep the Python worker running in its terminal.</p></section>
+    <section class="call-panel" aria-labelledby="session-title">
+      <div class="panel-heading"><h2 id="session-title">Test session</h2><span id="connection-state" class="state" role="status">Not connected</span></div>
+      <p id="session-message" aria-live="polite">Use headphones to avoid feedback. Your microphone is published only after you start.</p>
+      <div class="controls"><button id="start" class="primary">Start voice test</button><button id="mute" disabled>Mute microphone</button><button id="audio" disabled>Enable speaker audio</button><button id="end" class="danger" disabled>End session</button></div>
+      <dl class="details"><div><dt>Microphone</dt><dd id="microphone-status">Off</dd></div><div><dt>Agent</dt><dd id="agent-status">Not requested</dd></div><div><dt>Audio output</dt><dd id="audio-status">No remote track</dd></div><div><dt>Session limit</dt><dd id="session-limit">10 minutes</dd></div></dl>
+      <p class="small">This connects to your configured LiveKit and speech/model providers. Session creation does not confirm that the agent is ready. Nothing here starts a telephone call or charges the platform wallet.</p>
+    </section>
+    <div class="columns">
+      <section class="panel" aria-labelledby="transcript-title"><div class="panel-heading"><h2 id="transcript-title">Conversation transcript</h2><button id="clear-transcript" class="quiet">Clear</button></div><p class="small">Live transcription, when published by the worker. Partial segments can change.</p><ol id="transcript" class="transcript" aria-live="polite"><li class="empty">Transcripts will appear during your session.</li></ol></section>
+      <section class="panel" aria-labelledby="diagnostics-title"><div class="panel-heading"><h2 id="diagnostics-title">Connection diagnostics</h2><button id="download" class="quiet">Download log</button></div><p class="small">Local event timestamps are diagnostic signals. They do not measure when speech becomes audible at your endpoint.</p><ol id="diagnostics" class="diagnostics" aria-live="off"></ol><p class="small">The downloaded log excludes tokens and transcripts. It stays on your computer.</p></section>
+    </div>
+    <section class="panel" aria-labelledby="latency-title"><p class="eyebrow">MANUAL ACCEPTANCE PROCEDURE</p><h2 id="latency-title">Measure the conversation you actually hear.</h2><ol class="procedure"><li>State the language, network, region, browser, hardware, and load profile. Test Telugu, Hindi, Indian English, and code-switching separately.</li><li>Capture the caller’s microphone and actual speaker/headphone output on a shared recording timeline, using a loopback capture or external recorder. This page does not record either stream.</li><li>Mark the caller’s actual speech end and the first meaningful audible agent response. Include endpointing, transport, and playback delay. Measure the gap for each turn and report p95 with the sample count.</li><li>Report tool-dependent turns separately. While the agent speaks, interrupt naturally and listen for prompt cancellation and clearing of stale audio.</li></ol><div class="notice">Acceptance target: p95 under 500 ms. No measured endpoint latency or speech-quality result is established by this page.</div></section>
+    <div id="remote-audio" aria-hidden="true"></div>
+  </main>
+  <footer>India Voice · Local feasibility test <span>Telugu · Hindi · Indian English</span></footer>
+</body>
+</html>

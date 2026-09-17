@@ -30,6 +30,7 @@
   "devDependencies": {
     "@types/node": "22.20.2",
     "concurrently": "10.0.5",
+    "livekit-client": "2.17.0",
     "typescript": "5.9.3"
   }
 }

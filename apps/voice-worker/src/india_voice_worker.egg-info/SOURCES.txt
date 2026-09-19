@@ -5,6 +5,7 @@ src/india_voice/browser.py
 src/india_voice/config.py
 src/india_voice/guards.py
 src/india_voice/telemetry.py
+src/india_voice/worker.py
 src/india_voice_worker.egg-info/PKG-INFO
 src/india_voice_worker.egg-info/SOURCES.txt
 src/india_voice_worker.egg-info/dependency_links.txt
@@ -16,3 +17,4 @@ tests/test_config.py
 tests/test_guards.py
 tests/test_sdk_audio.py
 tests/test_telemetry.py
+tests/test_worker.py

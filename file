@@ -1,877 +1,579 @@
-India Voice Platform — Complete Project and Implementation Handoff
-1. Your role and working instructions
-You are continuing an existing project as its lead engineer. Work directly in the existing repository.
-The owner is a beginner. Explain decisions and setup steps in plain English. Create actual working files, preserve existing work, and report results honestly.
-Workspace on the current Windows machine:
-C:\Users\sreej\OneDrive\Desktop\emptyyy.py\my-web-app
-This handoff describes the repository as inspected on 18 September 2026.
-Important instructions
-- This is an existing implementation. Do not restart or replace it.
-- Preserve the approved architecture, database isolation, and prepaid reservation design.
-- Read applicable repository instructions and relevant source files before changing them.
-- Distinguish implemented code, passing offline tests, live provider verification, and future plans.
-- Never describe helper code as a completed voice pipeline.
-- Never claim latency, language quality, or production readiness without measurements.
-- Keep credentials in local environment files. Do not ask the owner to paste secrets into chat.
-- Do not discard uncommitted or untracked files.
-- Do not run commands or checks merely to repeat this handoff. The verification commands below are for subsequent implementation work.
-Approved scope and review boundaries
-1. Phase 1, Deliverable 1: repository, configuration, API/frontend foundation — completed and approved.
-2. Phase 1, Deliverable 2: tenant-isolated database foundation — completed and approved.
-3. Phase 1, Deliverable 3: standalone Python LiveKit/Sarvam browser voice prototype — approved, partially implemented, unfinished.
-4. Complete Deliverable 3 and report it for review.
-5. Stop before implementing the next phase.
-The later phases described below explain the complete product goal. Their inclusion does not remove the review boundary.
-Older README files still say Deliverable 3 requires approval. That wording is outdated: the owner has already approved Deliverable 3.
-2. What we are building
-Build a multi-tenant B2B AI voice-calling SaaS platform for Indian businesses.
-Target customers include:
+India Voice Platform — Next Implementation Stages
+1. Your role
+Act as the lead engineer continuing this existing project.
+Inspect the current repository and read applicable repository instructions before changing files. Preserve the working voice prototype and existing database protections.
+Implement actual functionality in the workspace. Do not replace the project with a new scaffold, add fake business data, or present unfinished integrations as working features.
+The owner is a beginner. Explain important decisions clearly, make routine implementation decisions independently, and provide exact startup instructions.
+Verification preference
+The owner previously requested no automated test runs. Preserve that preference unless explicitly changed.
+You may run the application and inspect its behavior. Add or maintain necessary test coverage and document the commands, but distinguish:
+- Source inspection.
+- Application startup.
+- Manual functional verification.
+- Automated tests actually executed.
+- Live provider verification.
+Do not claim production readiness for financial, authentication, or tenant-isolation functionality without adequate verification.
+2. Project goal
+Build a multi-tenant AI outbound voice platform for Indian businesses, including:
 - Real estate businesses.
 - Educational institutions.
 - Local small and medium businesses.
-A business will eventually be able to:
-1. Sign in to its own organization account.
-2. Add money to a prepaid INR wallet.
-3. Upload leads through CSV or receive them through authenticated APIs/webhooks.
-4. Configure an AI calling campaign.
-5. Choose the conversation language, voice, instructions, goals, calling schedule, and information to collect.
-6. Let the AI call eligible leads.
-7. Have natural, two-way conversations where callers can interrupt the AI.
-8. Send authorized WhatsApp brochures or follow-ups.
-9. Review recordings, timestamped transcripts, summaries, qualification scores, objections, and outcomes.
-10. Arrange appointments or bookings.
-11. See wallet balances, reserved funds, charges, and usage.
-Language requirements
-Support:
-- Telugu.
-- Hindi.
-- Indian English.
-- Natural language mixing, especially Telugu-English, often called Tenglish.
-Language support must be tested with real speech. Selecting a language code alone does not prove conversational quality.
-Future lead-response objective
-New leads received through an API/webhook should support an approximately 30-second callback workflow, subject to:
-- Consent.
-- Permitted calling times.
-- Available funds.
-- Provider and worker capacity.
-- Campaign configuration.
-This is a future product objective, not an implemented or guaranteed response time.
-3. Meaning of the main terms
-Term	Plain-English meaning
-SaaS	Software businesses use as an online service.
-B2B	The customers are businesses.
-Tenant / organization	One customer business whose data must remain separate from every other business.
-Frontend	The website users interact with.
-API / backend	Server code handling authorized requests, business rules, and data.
-Monorepo	One repository containing several related applications and shared packages.
-Voice worker	A separate program handling live voice conversations.
-STT	Speech-to-text: converting the caller’s audio into words.
-LLM	The language model that decides what the assistant should say.
-TTS	Text-to-speech: converting the assistant’s response into audio.
-Streaming	Sending and processing small pieces continuously instead of waiting for the whole response.
-VAD	Voice activity detection: detecting when someone starts or stops speaking.
-Endpointing	Deciding that the caller has finished their turn.
-Barge-in	The caller interrupts while the AI is speaking.
-Full duplex	Both sides can send audio at the same time.
-LiveKit	The room and real-time media infrastructure connecting participants and agents.
-WebRTC	Technology used to transport real-time browser audio.
-WebSocket	A persistent connection used to exchange streaming messages or audio.
-PCM16	Raw audio represented by signed 16-bit samples.
-Sample rate	The number of audio samples per second, such as 16,000 Hz.
-Resampling	Actually converting audio between sample rates.
-Backpressure	Preventing a fast producer from overwhelming a slower consumer or filling memory.
-SIP / PSTN	Technologies involved in connecting software voice systems to ordinary telephone calls.
-CDR	A provider’s call-detail record, including authoritative call timing information.
-ORM	A library for working with database records from application code.
-Migration	A versioned, reviewable database structure change.
-RLS	Database row-level security, used here to isolate organizations.
-Ledger	An append-only record of financial entries.
-Reservation / hold	Funds temporarily allocated to a call before the final charge is known.
-Settlement	Calculating the final charge and resolving the reservation.
-Idempotency	Ensuring retries or duplicate events do not repeat an action or charge.
-Reconciliation	Checking uncertain local state against authoritative provider information.
-p95 latency	A latency threshold that 95% of measured samples fall at or below.
-Mocked test	A test using simulated providers or components.
-Live provider test	A test that actually contacts the external service.
+A customer business should eventually be able to:
+1. Sign in securely.
+2. Configure its organization and team.
+3. Add funds to a prepaid INR wallet.
+4. Import leads or receive them through authenticated integrations.
+5. Configure an AI calling campaign.
+6. Run eligible calls within schedules, consent rules, capacity, and available funds.
+7. Have natural conversations in Telugu, Hindi, Indian English, and mixed languages.
+8. Send authorized WhatsApp messages.
+9. Review call outcomes, recordings, transcripts, and extracted information.
+10. Manage appointments, follow-ups, usage, and billing.
+The browser voice prototype is the starting point. It is not yet the complete SaaS product.
+3. Current confirmed state
+Completed foundation
+The repository contains:
+- Next.js/React/TypeScript frontend.
+- NestJS API using Fastify.
+- PostgreSQL with Drizzle ORM.
+- Versioned database migrations.
+- Redis infrastructure.
+- API health/readiness endpoints.
+- Minimal frontend overview/setup pages.
+- Tenant isolation and prepaid accounting schema.
+The eight original database tables are:
+organizations
+users
+wallets
+wallet_transactions
+wallet_reservations
+campaigns
+leads
+call_logs
+Working browser voice prototype
+The owner has successfully used the browser prototype and heard an AI response.
+The working path is:
+Browser microphone
+    → LiveKit
+    → Sarvam Saaras Realtime STT
+    → Streaming conversation LLM
+    → Sarvam Bulbul v3 TTS
+    → Browser speaker
+Silero VAD is included for local speech detection.
+This user-confirmed success establishes basic live conversation functionality. It does not establish:
+- Production telephone compatibility.
+- Reliable interruption behavior under all races.
+- Concurrency capacity.
+- Complete resource bounds and cleanup.
+- Measured language quality.
+- The latency acceptance target.
+Inspect the latest code to determine the exact implementation status.
+Current voice configuration worth preserving
+At the last working checkpoint:
+LiveKit server: 1.13.7
+LiveKit JavaScript client: 2.17.0
+LiveKit Agents and provider plugins: 1.8.1
+STT: Sarvam STTRealtime / Saaras realtime
+TTS: Sarvam Bulbul v3
+LLM endpoint: Groq OpenAI-compatible API
+LLM model: openai/gpt-oss-20b
+The previous llama-3.1-8b-instant configuration returned model_not_found. Do not restore it accidentally.
+For the current Groq GPT-OSS configuration:
+- Low reasoning effort is selected.
+- Reasoning is excluded from the response sent toward speech.
+- Completion-token limits are separate from character limits.
+The browser now uses text-stream transcription rather than rendering both text streams and legacy transcription events, which previously produced duplicate lines.
+Local connectivity
+The current local setup uses:
+Web application:       http://localhost:3000
+API:                   http://localhost:3001
+Browser voice harness: http://127.0.0.1:8765
+LiveKit signaling:     127.0.0.1:7880
+LiveKit media TCP:      127.0.0.1:7881
+LiveKit media UDP:      127.0.0.1:7882
+The local LiveKit setup is designed for the browser, worker, and Docker Desktop running on the same computer.
+Do not introduce a hardcoded Wi-Fi address.
+Important limitation
+The current website is primarily a foundation shell. Do not assume campaign management, authentication, payments, CRM, or telephony are implemented merely because their database tables exist.
+4. Architecture to preserve
+Responsibility	Approved technology
+Web application	Next.js, React, TypeScript
+API	NestJS with Fastify
+Database	PostgreSQL
+ORM/migrations	Drizzle
+Queue infrastructure	Redis
+Background jobs	BullMQ
+Voice worker	Standalone Python LiveKit Agents
+STT	Sarvam Saaras Realtime
+TTS	Sarvam Bulbul v3 streaming
+Speech detection	Silero VAD
+Conversation model	Configurable streaming adapter
+Intended telephony	Exotel, subject to capability verification
+Payments	Razorpay
+Messaging	Meta WhatsApp Cloud API
+Recording storage	Private encrypted object storage, with S3 as the intended direction
 
 
-4. Approved architecture and technologies
-Responsibility	Technology / decision	Current status
-Frontend	Next.js, React, TypeScript	Foundation implemented
-API	NestJS with Fastify	Foundation implemented
-Database	PostgreSQL	Implemented locally
-Schema and migrations	Drizzle ORM and Drizzle Kit	Implemented
-Background infrastructure	Redis	Local infrastructure implemented
-Background jobs	BullMQ	Future implementation
-Voice service	Standalone Python LiveKit Agents worker	Partial foundation only
-Streaming STT	Sarvam Saaras Realtime	Selected; worker integration missing
-Streaming conversation model	Configurable, replaceable LLM	Configuration exists; integration missing
-Streaming TTS	Sarvam Bulbul v3	Selected; worker integration missing
-Local speech detection	Silero VAD	Dependency and local test exist; worker integration missing
-Browser voice testing	LiveKit JavaScript client and standalone local test page	Implemented with mocked tests
-Future telephony	Exotel	Intended; capabilities require verification
-Future payments	Razorpay	Not implemented
-Future WhatsApp	Meta WhatsApp Cloud API	Not implemented
-Future recording storage	Private encrypted S3 storage	Not implemented
-Production location	Prefer India/Mumbai where supported	Not deployed
-
-
-Tailwind CSS and shadcn/ui were proposed for future UI development. The existing frontend currently uses responsive CSS; those libraries are not part of the completed UI implementation.
-Architectural separation
-Keep responsibilities separate:
-Business website
-    |
-    v
-NestJS API
-    |
-    +--> PostgreSQL: durable business and financial state
-    |
-    +--> Redis/BullMQ: future background jobs
-
-Browser microphone / future telephone connection
-    |
-    v
-LiveKit media room
-    |
-    v
-Python voice worker
-    |
-    +--> Sarvam STT
-    +--> Conversation LLM
-    +--> Sarvam TTS
-    +--> Local Silero VAD
-    |
-    v
-LiveKit audio playback
-Slow business operations, post-call analysis, and messaging must not block the live audio path.
-5. Existing repository
-Important paths:
-apps/
-  api/
-    NestJS/Fastify application, configuration, health/readiness, tests
-
-  web/
-    Next.js application
-    Overview and setup pages
-    Responsive application shell
-
-  voice-worker/
-    README.md
-    pyproject.toml
-
-    src/india_voice/
-      __init__.py
-      config.py
-      guards.py
-      telemetry.py
-      browser.py
-
-    browser/
-      index.html
-      styles.css
-      app.js
-      app.test.cjs
-
-    tests/
-      test_config.py
-      test_guards.py
-      test_telemetry.py
-      test_browser.py
-      test_sdk_audio.py
-
-packages/
-  database/
-    src/schema.ts
-    src/client.ts
-    src/validation.ts
-    src/billing.ts
-    drizzle/
-    sql/
-    drizzle.config.ts
-
-infra/
-  compose.yaml
-  postgres/01-roles.sh
-
-docs/
-  architecture.md
-  verification.md
-
-scripts/
-  run-web.cjs
-  pin-dependencies.cjs
-
-tests/
-  database.unit.test.cjs
-  database.integration.test.cjs
-  smoke.test.cjs
-
-.env.example
-package.json
-package-lock.json
-tsconfig.base.json
-README.md
-Missing central file:
-apps/voice-worker/src/india_voice/worker.py
-The Python package declares this console entry point:
-india-voice-worker = india_voice.worker:main
-Its target module does not yet exist. Consequently, there is no complete runnable voice agent.
-6. Completed work: Deliverable 1
-API foundation
-Implemented:
-- NestJS using Fastify.
-- Environment/configuration validation.
-- Secret-redacted configuration errors.
-- PostgreSQL and Redis readiness checks.
-- GET /health for process liveness.
-- GET /ready for dependency and database safety checks.
-- HTTP/configuration tests.
-Default local API:
-http://localhost:3001
-Endpoints:
-http://localhost:3001/health
-http://localhost:3001/ready
-/ready returns HTTP 503 when dependencies are unavailable or the database role is unsafe.
-Authentication boundary
-Current scaffold mode:
-AUTH_MODE=disabled
-There is no completed:
+Keep the live audio path separate from business APIs and background processing.
+Do not put slow analytics, messaging, or post-call extraction directly in the audio loop.
+Use current official provider documentation when implementing integrations. Verify that examples match the installed SDK versions.
+5. Implementation order
+Work through the following milestones. Each milestone should produce usable functionality, clear documentation, and an honest status report.
+Do not spend all the effort on visual redesign while leaving the underlying workflows disconnected.
+Milestone 1 — Preserve and stabilize the working voice baseline
+Before expanding the product:
+1. Document the exact working versions and startup commands.
+2. Make dependency installation reproducible.
+3. Complete the Python dependency lock if still missing.
+4. Update stale README statements that still describe voice as unimplemented.
+5. Keep secrets out of Git and browser-visible configuration.
+6. Make provider failures visible and understandable.
+7. Review existing timeout, generation-budget, cancellation, and cleanup code.
+8. Ensure configured limits actually reach the production pipeline.
+9. Ensure session expiry closes the job and relevant connections.
+10. Preserve the working local media configuration.
+Voice acceptance behavior
+When the caller interrupts:
+- Cancel obsolete LLM generation.
+- Cancel obsolete TTS generation.
+- Clear queued playback.
+- Reject late results from the old response.
+- Respond to the newest caller turn.
+Do not assume that installing Silero or setting one SDK option proves all of this works.
+Latency contract
+Keep the existing acceptance target:
+p95 below 500 ms from the caller’s actual end of speech to the first meaningful audible agent response at the caller endpoint.
+Include endpointing, processing, transport, and playback.
+Internal timing logs are not equivalent to caller-perceived latency. Mark the target unmeasured until it is actually measured.
+Milestone 2 — Authentication, organizations, and authorization
+Implement authentication before exposing customer business data or financial actions.
+Required functionality
 - Sign-in.
-- Organization membership authorization.
-- Tenant business API.
-- Production authentication adapter.
-API production startup is deliberately blocked until real authentication exists.
-Frontend foundation
-Implemented:
-- Next.js application shell.
-- Overview page at /.
-- Setup page at /setup.
-- Responsive CSS.
-- Real API status display.
-Default URL:
-http://localhost:3000
-The frontend does not contain a completed CRM, campaign manager, billing dashboard, or functioning voice product.
-Local infrastructure
-Implemented:
-- PostgreSQL and Redis through Docker Compose.
-- Persistent local volumes.
-- Loopback-bound published ports.
-- Separate runtime, migration, and administrative database roles.
-- Separate disposable integration-test database.
-7. Completed work: Deliverable 2
-Eight required database tables exist:
-Table	Purpose
-organizations	Customer business / tenant root
-users	Organization membership and identity references
-wallets	Posted funds, reserved funds, currency, version
-wallet_transactions	Append-only financial ledger
-wallet_reservations	Funds authorized and held for calls
-campaigns	Agent/campaign configuration and billing settings
-leads	Contact, source, consent, qualification, scheduling
-call_logs	Call lifecycle, duration, billing snapshots, recording/transcript references
-
-
-Tenant isolation implemented
-- Tenant-owned records contain organization ownership.
-- Composite foreign keys prevent cross-tenant relationships.
-- Calls cannot reference a lead belonging to the wrong campaign.
-- Forced PostgreSQL row-level security protects every table.
-- The runtime role is voice_app.
-- It is not a table owner, superuser, or BYPASSRLS role.
-- Migrations use voice_migrator.
-Use:
-withTenantTransaction(db, authorizedOrganizationId, callback)
-All business queries inside the callback must use its transaction.
-Tenant context is transaction-local and clears after commit or rollback.
-Important: an organization ID supplied in an HTTP header is not authorization. Future authentication must verify the user and their organization membership.
-Database protections implemented
-- Integer-paise money.
-- Nonnegative balances and holds.
-- Reserved funds cannot exceed posted funds.
-- One wallet per organization.
-- Append-only ledger protections.
-- Idempotency and provider-reference uniqueness.
-- Immutable billing snapshots.
-- Reservation lifecycle and terminal-accounting constraints.
-- Runtime validation for structured JSON data.
-- Versioned schema and security migrations.
-What this does not implement
-The schema is not a completed billing engine.
-Still missing:
-- Verified payment handling.
-- Atomic credit/reserve/extend/settle services.
-- Campaign pause notifications.
-- Provider duration enforcement.
-- Reconciliation workers.
-- Proof of aggregate accounting correctness under concurrent calls.
-8. Prepaid accounting contract — preserve it
-All money uses integer paise:
-100 paise = ₹1
-Use PostgreSQL BIGINT and JavaScript bigint. Serialize monetary values intentionally, typically as decimal strings.
-Never use floating-point rupee calculations for wallet accounting.
-Wallet equation
-available funds = posted balance - reserved funds
-Before dialing
-- Available funds must cover at least one minute at the applicable rate.
-- Parallel calls must reserve funds atomically.
-- Reserve enough for the explicit authorized maximum duration, billing rounding, and termination margin.
-- A simple unlocked balance read is insufficient.
-- Insufficient funds should eventually pause the campaign and create a notification obligation.
-Billing formula
-For connected duration d seconds, billing quantum q of 30 or 60 seconds, and rate r paise/minute:
-If d = 0:
+- Sign-out.
+- Session expiry and revocation.
+- Current-user endpoint.
+- Organization membership.
+- Role-based authorization.
+- Protected application routes.
+- Safe initial organization/owner provisioning.
+Use the existing roles where appropriate:
+owner
+admin
+member
+viewer
+Define and enforce permissions on the server.
+Examples:
+- Viewers can read permitted data.
+- Members can perform explicitly allowed operational actions.
+- Administrators manage campaigns and members.
+- Owners control sensitive organization and billing settings.
+Do not rely on hiding frontend buttons for authorization.
+Authentication design decision
+Inspect the repository for an existing authentication direction.
+If none exists, propose a concrete supported approach—such as managed OIDC or carefully implemented local authentication—and explain:
+- Required external accounts, if any.
+- Session storage.
+- Account recovery.
+- Organization membership mapping.
+- Production configuration.
+Do not invent a login screen that accepts arbitrary credentials.
+Security requirements
+- Server-side session verification.
+- Secure cookie handling where cookies are used.
+- CSRF protection for cookie-authenticated mutations.
+- Login abuse protection.
+- Generic authentication failure messages.
+- No credentials in client bundles or logs.
+- Membership and organization status checked appropriately.
+- Tenant identity derived from verified authorization.
+Preserve transaction-local PostgreSQL tenant context.
+Milestone 3 — Build the actual product website
+Improve the existing Next.js application into a coherent, usable dashboard.
+Use real API data. Empty states should explain how to get started.
+Navigation
+Recommended main sections:
+Overview
+Agents
+Campaigns
+Leads
+Calls
+Wallet
+Integrations
+Settings
+“Agents” here means reusable conversation configurations, not the background worker process itself.
+If reusable agent profiles need a new table, introduce it through a reviewed migration.
+Overview
+Show real information such as:
+- Available wallet funds.
+- Reserved funds.
+- Active campaigns.
+- Calls awaiting processing.
+- Recent call outcomes.
+- Qualified leads.
+- Provider/setup issues requiring attention.
+Define each metric clearly. Do not invent charts or sample totals.
+Agent configuration
+Allow an authorized user to configure:
+- Agent name.
+- Business description.
+- Conversation goals.
+- Persona and tone.
+- Preferred language.
+- Voice.
+- Opening message.
+- Questions to ask.
+- Fields to collect.
+- Instructions for handling uncertainty.
+- Allowed tools.
+Provide a browser preview using the working voice infrastructure.
+Do not expose provider keys or allow an agent prompt to grant itself additional permissions.
+Campaigns
+Implement a usable creation/editing flow:
+1. Campaign details and goal.
+2. Agent configuration.
+3. Lead selection/import.
+4. Calling schedule.
+5. Retry policy.
+6. Concurrency and duration limits.
+7. Review.
+8. Launch or schedule.
+Include clear status and pause reasons.
+Launching must depend on server-side eligibility, provider readiness, and funds.
+Leads CRM
+Include:
+- Search and filtering.
+- Campaign and status filters.
+- Qualification filters.
+- Lead detail page.
+- Consent details.
+- Attempt history.
+- Next scheduled action.
+- Custom extracted attributes.
+- Do-not-call controls.
+Calls
+Include:
+- Call history.
+- Status and duration.
+- Outcome.
+- Charge and settlement status.
+- Transcript.
+- Recording playback when authorized and available.
+- Summary and extracted information.
+- Clear failure information.
+Wallet
+Include:
+- Posted balance.
+- Reserved funds.
+- Available balance.
+- Transaction history.
+- Per-call charges.
+- Top-up flow.
+- Pending payment status.
+- Reconciliation/dispute visibility where appropriate.
+Integrations and settings
+Show truthful states:
+Not configured
+Configured
+Connection not verified
+Verified
+Needs attention
+Do not label a provider “connected” solely because an environment variable is nonempty.
+UI quality
+- Responsive layouts.
+- Accessible labels and keyboard navigation.
+- Loading, empty, success, and error states.
+- Clear amounts and timestamps.
+- Consistent forms and validation.
+- No placeholder buttons pretending to perform actions.
+- Plain language suitable for business users.
+Reuse the existing frontend rather than replacing it unnecessarily.
+Milestone 4 — Implement real prepaid billing services
+The schema already supports important constraints. Implement the service layer carefully.
+Required services
+- Create a Razorpay payment order.
+- Verify payment events.
+- Credit successful top-ups exactly once.
+- Reserve funds before dialing.
+- Settle calls from authoritative connected duration.
+- Release unused authorization safely.
+- Reconcile uncertain or expired reservations.
+- Pause campaigns when funds are insufficient.
+- Generate durable notification obligations.
+Money rules
+All monetary values use integer paise.
+available = posted balance - reserved funds
+No floating-point wallet arithmetic.
+Use decimal strings at JSON boundaries where needed.
+Reservation rules
+- Available funds must cover at least one minute.
+- Reserve the full explicit authorized duration, rounding, and termination margin.
+- Concurrent calls must not spend the same available balance.
+- Use database transactions and appropriate locking.
+- Keep rate and duration snapshots immutable.
+Settlement rules
+For connected duration d, billing quantum q of 30 or 60 seconds, and rate r paise/minute:
+d = 0:
     charge = 0
 
-Otherwise:
+d > 0:
     billable seconds = ceil(d / q) * q
     charge = billable seconds * r / 60
-Use integer-safe arithmetic.
-The current design requires an even paise-per-minute rate for 30-second billing so each quantum produces whole paise.
-Immutable snapshots
-An existing call’s rate, quantum, funded duration, and margin must remain unchanged when someone edits its campaign.
-Reservation lifecycle
-active
-    -> awaiting_settlement
-    -> settled / released / expired
-Terminal accounting must account for the authorized amount correctly.
-Settlement and provider evidence
-- Credit top-ups only after verified successful payment events.
-- Derive final connected duration from verified authoritative telephony evidence.
-- Duplicate and reordered events must not double-charge or release funds twice.
-- A call that connected and subsequently failed can still incur a charge.
-- A call that never connected has zero customer talk-time charge.
-- Atomically update wallet, reservation, ledger, and call settlement state.
-- Reservation expiry triggers reconciliation; it does not automatically justify releasing money.
-Strict prepaid exposure cannot be guaranteed by an application timer alone. It depends on verified provider/gateway duration enforcement.
-9. Deliverable 3: what exists so far
-A. Python dependency configuration
-apps/voice-worker/pyproject.toml exists.
-Current direct dependencies:
-livekit-agents==1.8.1
-livekit-plugins-sarvam==1.8.1
-livekit-plugins-silero==1.8.1
-livekit-plugins-openai==1.8.1
-livekit==1.1.18
-livekit-api==1.2.1
-aiohttp==3.14.3
-openai==2.54.0
-pydantic==2.13.5
-python-dotenv>=1.0,<2
-Development dependencies:
-pytest==9.1.1
-pytest-asyncio==1.4.0
-ruff==0.16.8
-pip-tools==7.6.1
-The local virtual environment exists at:
-apps/voice-worker/.venv
-The inspected machine uses Python 3.11.3.
-Remaining dependency work:
-- Pin python-dotenv precisely.
-- Produce a reproducible Python dependency lock.
-- Verify package installation and console entry points.
-- Do not mistake pip check success for a complete application.
-B. Configuration module
-config.py implements:
-- Validated settings.
-- Server-side secret handling.
-- Redacted configuration errors.
-- Provider URL validation.
-- Language and voice settings.
-- Timeouts and session/output budgets.
-- Optional instructions file.
-- Conversational instructions for Telugu, Hindi, English, and Tenglish.
-These settings are not yet wired into a complete worker.
-C. Cancellation helpers
-guards.py implements:
-- A generation epoch/token mechanism.
-- Invalidating obsolete generation.
-- Checking validity before and after awaited provider results.
-- Stream timeouts.
-- Output budgets.
-- Async generator cleanup.
-These helpers are not yet proof that the complete audio pipeline has bounded queues or correct live interruption behavior.
-D. Timing and reporting
-telemetry.py implements:
-- Structured JSONL timing records.
-- Timing-field filtering.
-- p50/p95 reporting.
-- Handling SDK timing data.
-- Excluding correlated cancelled/failed samples where identified.
-- Explicit separation of internal timings and caller-audible measurements.
-It is not yet attached to a running voice worker.
-E. Browser test harness
-Implemented:
-- Standalone local aiohttp server.
-- Browser microphone controls.
-- Join/end session flow.
-- LiveKit connection and reconnect UI states.
-- Audio autoplay recovery.
-- Transcript handling.
-- Guards against obsolete asynchronous browser events.
-- Server-issued short-lived room tokens.
-- Random prototype rooms and named agent dispatch.
-- Limits on session count and duration.
-- Room cleanup and retry logic.
-- Loopback/same-origin protections.
-Default intended local page:
-http://127.0.0.1:8765
-The browser uses:
-livekit-client==2.17.0
-It is loaded from the installed local npm package.
-The harness has mocked tests. A complete live browser conversation has not been demonstrated because the worker is missing.
-F. Offline SDK tests
-Tests exercise:
-- LiveKit session behavior using simulated LLM/TTS nodes.
-- Interruption checkpoints.
-- Shutdown.
-- Simulated LLM failure.
-- Native audio resampling.
-- Real local Silero inference on silence.
-These are not live Sarvam or live conversation-model tests.
-10. Actual test results and known failures
-Keep historical and current results separate.
-Foundation results recorded on 15 September 2026
-docs/verification.md records:
-- Type checking passed.
-- Database/API/frontend builds passed.
-- Fresh migrations and migration replay passed.
-- Database unit tests: 7 passed.
-- API tests: 7 passed.
-- Real PostgreSQL integration tests: 19 passed.
-- Built-process API/Next HTTP smoke test: 1 passed.
-Total:
-34 passing foundation tests
-These are historical results, not a fresh rerun of the foundation on 18 September.
-Voice-related results obtained on 18 September 2026
-Full current Python suite:
-61 passed
-2 failed
-24 subtests passed
-The separate subtest count should not be presented as 24 additional top-level tests.
-The failing cases are:
-test_sdk_interrupt_cancels_each_pipeline_checkpoint_and_never_resumes[capture]
-
-test_sdk_interrupt_cancels_each_pipeline_checkpoint_and_never_resumes[audio]
-Both failed at:
-assert output.resume_count == 0
-Observed:
-resume_count == 1
-Investigate whether this is:
-- An incorrect test assumption about SDK lifecycle calls.
-- A real interruption/resumption issue.
-- A combination requiring both test and integration changes.
-Do not simply remove the assertion to make tests pass. Verify actual stale-audio behavior and the timing of resume calls.
-Browser JavaScript tests:
-6 passed
-0 failed
-Python dependency consistency:
-pip check: No broken requirements found.
-Ruff:
-3 import-order issues
-Affected files:
-src/india_voice/telemetry.py
-tests/test_browser.py
-tests/test_telemetry.py
-Not verified
-- A complete live LiveKit room conversation.
-- Sarvam realtime account entitlement.
-- Live Sarvam STT/TTS.
-- Live LLM streaming.
-- Real multilingual conversational quality.
-- Caller-perceived p95 latency.
-- Telephony.
-- Production load or concurrency.
-Also, root npm run verify currently excludes the new Python suite and browser JavaScript suite.
-11. Provider and SDK findings to preserve
-Verify official documentation against the installed versions when implementing. Do not blindly copy examples written for different releases.
-Sarvam Saaras Realtime STT
-Use the realtime class:
-sarvam.STTRealtime
-Do not accidentally substitute the legacy sarvam.STT interface.
-The realtime model is:
-saaras:v3-realtime
-Realtime access requires the appropriate Sarvam account subscription/entitlement.
-Supported settings relevant to this project include automatic language identification and code-mixed transcription.
-Manual endpointing requires explicit stream flushing. Do not assume that local Silero end-of-speech automatically flushes the default STT node.
-Realtime streams do not automatically reconnect after failure. A fresh stream/session policy needs explicit implementation and testing.
-References: LiveKit Sarvam STT guide, Sarvam realtime API.
-Sarvam Bulbul v3 TTS
-Use streaming synthesis with:
-model="bulbul:v3"
-The intended audio format is mono PCM16 at 24 kHz, subject to validation with the pinned SDK/provider interface.
-Validate voice, language, pace, temperature, streaming completion, and cancellation settings.
-Inspect connection reuse carefully: cancelling one utterance must not allow unfinished audio to appear in a later utterance.
-References: LiveKit Sarvam TTS guide, Sarvam streaming TTS API.
-LiveKit and Silero integration concerns
-Prior source inspection identified these points to verify:
-- The pinned SDK supports AgentServer and AgentSession.
-- Turn-handling configuration must match the installed release.
-- Disable resuming obsolete speech after interruption.
-- Account for interruption behavior during any initial echo-cancellation warm-up.
-- Cancel upstream generators and queued speech, then clear playback buffers.
-- Native audio output backpressure does not prove every internal SDK queue is bounded.
-- Silero detector and stream cleanup APIs differ; do not invent an aclose() method on an object that lacks it.
-- Browser audio may arrive at a different sample rate from STT input.
-- Resample audio properly; changing a frame’s declared rate is not resampling.
-References: LiveKit turn-handling options, pipeline nodes, Silero Python reference.
-Conversation LLM
-The selected direction is a configurable streaming adapter.
-Current configuration expects an OpenAI-compatible endpoint, but:
-- No final live model has been selected.
-- No live model benchmark has been performed.
-- Compatibility must be verified with the actual chosen provider.
-- Installing an OpenAI adapter does not require selecting OpenAI as the provider.
-- Do not assume every compatible endpoint supports identical parameters or tool behavior.
-12. Remaining work to finish Deliverable 3
-12.1 Implement the actual worker
-Create the missing worker module and working startup entry point.
-Wire together:
-Browser microphone
-  -> LiveKit audio input
-  -> correct decoding/channel handling/resampling
-  -> Silero VAD + Sarvam realtime STT
-  -> conversation LLM stream
-  -> Bulbul v3 TTS stream
-  -> LiveKit audio output
-  -> browser speaker
-Support Windows startup and clean worker process lifecycle.
-12.2 Make audio streaming correct
-Implement and verify:
-- Sample rates, channels, PCM encoding, and frame sizes.
-- Actual resampling.
-- Bounded buffering or explicit overload behavior.
-- Backpressure through the whole pipeline.
-- Provider idle timeouts.
-- Whole-turn timeouts.
-- Maximum input/output/session budgets.
-- Cleanup on cancellation, disconnect, timeout, failure, and shutdown.
-12.3 Make interruptions reliable
-When the caller starts speaking:
-1. Detect speech locally.
-2. Invalidate the obsolete response generation.
-3. Cancel its LLM stream.
-4. Cancel its TTS stream.
-5. Stop pending audio forwarding.
-6. Clear queued playback.
-7. Reject late results from the old generation.
-8. Respond to the new caller turn.
-Test rapid repeated interruptions and races while blocked in provider reads or audio writes.
-12.4 Resolve endpointing
-Choose and implement a coherent strategy:
-- Provider endpointing with local Silero interruption handling; or
-- Correctly bridged manual endpointing with explicit flushes.
-Do not add multiple silence delays accidentally. Test short utterances, pauses, final transcripts, and no-final-transcript failures.
-12.5 Handle failures and reconnects
-Define behavior for:
-- STT socket failure.
-- LLM stream failure.
-- TTS socket failure.
-- LiveKit reconnecting.
-- Browser disconnect.
-- Session expiry.
-- Worker shutdown.
-No automatic replay of obsolete conversation audio.
-A browser/media reconnect and a provider websocket reconnect are different events; document and test them separately.
-12.6 Integrate timing
-Measure:
-- Local speech start/end detection.
-- Endpointing.
-- STT finalization.
-- LLM first token.
-- TTS first audio.
-- Playback submission/start.
-- Interruption/cancellation timing.
-- Whole-session cleanup.
-Keep sensitive transcript content out of routine timing logs.
-12.7 Finish browser testing
-Use the existing standalone harness.
+Preserve the current whole-paise rule for 30-second billing.
+Atomically:
+1. Calculate the authorized charge.
+2. Update wallet funds.
+3. Resolve the reservation.
+4. Append the ledger entry.
+5. Mark the call settled.
+Handle duplicate, delayed, reordered, and retried events.
+Critical boundaries
+- A browser payment-success callback alone must never credit funds.
+- Verify provider webhook authenticity using the required raw request body.
+- Match provider events to server-stored orders, amounts, currency, and account context.
+- A call that connected and later failed can still be billable.
+- A timer expiring does not prove funds can be released.
+- Preserve ledger immutability.
+- Do not claim strict prepaid exposure protection until provider duration enforcement is verified.
+Milestone 5 — Verify and implement telephone connectivity
+The browser prototype does not call ordinary phone numbers.
+The intended provider is Exotel, but the exact connection must be established from official documentation and the actual account capabilities.
+First produce a concrete integration design
 Verify:
-- Room creation.
-- Named dispatch matching the worker.
-- Microphone permission.
-- Actual audible replies.
-- Transcript updates.
-- End-session cleanup.
-- Rejoining.
-- Reconnect handling.
-- Expired sessions.
-- No old audio after interruption or a new session.
-A local LiveKit server configuration has not yet been added to the existing PostgreSQL/Redis Compose stack.
-12.8 Finish documentation and reproducibility
-- Complete Python dependency locking.
-- Update .env.example.
-- Update root and worker READMEs.
-- Provide exact startup commands.
-- Document missing account requirements.
-- Preserve dated historical verification results.
-- Add new dated results.
-- Clearly distinguish offline tests from live tests.
-Then stop for review before later phases.
-13. Required local configuration
-The complete voice worker requires these seven values:
-LIVEKIT_URL=
-LIVEKIT_API_KEY=
-LIVEKIT_API_SECRET=
-
-SARVAM_API_KEY=
-
-LLM_BASE_URL=
-LLM_API_KEY=
-LLM_MODEL=
-Use actual local values. Never commit them.
-Additional configuration already recognized by config.py:
-LLM_PROVIDER=openai-compatible
-
-VOICE_AGENT_NAME=india-voice-prototype
-VOICE_LANGUAGE=en-IN
-
-SARVAM_STT_LANGUAGE=auto
-SARVAM_STT_MODE=codemix
-SARVAM_STT_STREAM_TYPE=fast
-
-SARVAM_TTS_LANGUAGE=en-IN
-SARVAM_TTS_SPEAKER=shubh
-SARVAM_TTS_PACE=1.0
-SARVAM_TTS_TEMPERATURE=0.6
-
-VOICE_INSTRUCTIONS_FILE=
-
-VOICE_ENDPOINT_SILENCE_MS=180
-VOICE_INTERRUPTION_MS=80
-VOICE_PROVIDER_TIMEOUT_SECONDS=8
-VOICE_TURN_TIMEOUT_SECONDS=30
-
-VOICE_MAX_OUTPUT_CHARACTERS=1200
-VOICE_MAX_OUTPUT_AUDIO_SECONDS=30
-VOICE_MAX_INPUT_SECONDS=30
-VOICE_SESSION_SECONDS=600
-
-VOICE_METRICS_DIRECTORY=.local/voice-metrics
-VOICE_LATENCY_P95_TARGET_MS=500
-VOICE_LATENCY_PROFILE=unmeasured
-These are configuration defaults, not proven optimal settings.
-Supported configured conversation-language values:
-te-IN
-hi-IN
-en-IN
-te-en
-te-en is an application instruction choice for Tenglish; do not assume every provider accepts it as a language code.
-The browser helper itself only needs LiveKit configuration. A working conversation also requires the worker and speech/LLM credentials.
-Exotel, Razorpay, WhatsApp, and S3 credentials are for later phases.
-14. Latency acceptance target
-The agreed target is:
-p95 under 500 milliseconds from the caller’s actual end of speech to the first meaningful audible agent response at the caller endpoint.
-Include:
-- Endpointing.
-- STT processing.
-- LLM processing.
-- TTS processing.
-- Network transport.
-- Media buffering.
-- Caller playback.
-Do not report only provider processing time as end-to-end latency.
-Do not treat a filler sound or a browser track-attachment event as the first meaningful response.
-Report:
-- Language.
-- Network conditions.
-- Region.
-- Load/concurrency.
-- Number of samples.
-- Cold versus warm conditions.
-- Tool-dependent turns separately.
-- Failures and interrupted turns separately.
-Internal worker measurements and acoustic/caller-endpoint measurements are different.
-The target has not been demonstrated.
-15. Existing setup and later verification commands
-Current Windows tools observed:
-Node.js 22.20.0
-npm 10.9.3
-Python 3.11.3
-Docker Desktop using Linux containers
-Use npm.cmd if PowerShell blocks npm.ps1.
-Foundation startup
-For a fresh setup only:
-Copy-Item .env.example .env
-npm.cmd ci
-npm.cmd run infra:up
-npm.cmd run db:migrate
-npm.cmd run dev
-Preserve an existing .env.
-Changing a PostgreSQL password in .env does not change an existing database role’s password.
-Foundation verification commands
-npm.cmd run typecheck
-npm.cmd run build
-npm.cmd test
-npm.cmd run test:database
-npm.cmd run test:smoke
-Or:
-npm.cmd run verify
-Database integration tests intentionally reset only the guarded local voice_platform_test database. Preserve their safety checks.
-Current voice check commands
-& apps/voice-worker/.venv/Scripts/python.exe -m pytest -c apps/voice-worker/pyproject.toml apps/voice-worker/tests -q
-
-node --test apps/voice-worker/browser/app.test.cjs
-
-& apps/voice-worker/.venv/Scripts/python.exe -m ruff check apps/voice-worker/src apps/voice-worker/tests
-
-& apps/voice-worker/.venv/Scripts/python.exe -m pip check
-Voice startup status
-Do not present india-voice-worker as working yet: its module is missing.
-After implementation, provide tested commands for:
-1. Installing the Python package and locked dependencies.
-2. Validating local configuration.
-3. Starting the worker.
-4. Starting the browser harness.
-5. Opening the test page.
-6. Generating the timing report.
-7. Shutting everything down cleanly.
-16. Complete roadmap after Deliverable 3 review
-These are remaining product phases, not completed features.
-Phase 2 — Authentication and prepaid billing services
-Implement:
-- Real sign-in and sessions.
-- Verified organization membership.
-- Role-based authorization.
-- Authorized organization provisioning.
-- Razorpay payment creation and verification.
-- Verified, idempotent top-up crediting.
-- Atomic call reservations.
-- Funds checks under concurrency.
-- Reservation extension if supported safely.
-- Authoritative-duration settlement.
-- Duplicate/out-of-order event handling.
-- Reconciliation.
-- Low-balance notifications and campaign pausing.
-- Wallet, transaction, and usage screens.
-Validate concurrent accounting and crash/retry recovery.
-Authentication is a prerequisite for exposing tenant business endpoints.
-Phase 3 — Lead ingestion and campaign execution
-Implement:
-- CSV import, validation, and error reporting.
-- Authenticated API/webhook ingestion.
-- Deduplication and external references.
-- Separate voice and WhatsApp consent evidence.
-- Campaign creation and editing.
-- Persona, goals, scripts, language, voice, and capture fields.
-- Calling schedules and retries.
-- Per-organization concurrency controls.
-- Redis/BullMQ dispatch.
-- Approximately 30-second eligible lead callback workflow.
-- Campaign progress, pause, resume, and failure visibility.
-- Reservation-before-dial enforcement.
-Jobs must preserve tenant identity and be safe to retry.
-Phase 4 — Telephony and production voice integration
-Implement:
-- Verify actual Exotel SIP/media integration.
-- Authorized caller-ID and account setup.
-- Provider call creation and lifecycle handling.
+- Outbound call creation.
+- Authorized caller-ID requirements.
+- SIP or supported bidirectional media connectivity.
+- How media reaches LiveKit and the Python agent.
+- Whether a separate LiveKit SIP service/trunk is required.
 - Webhook authentication.
-- Authoritative connected duration/CDRs.
-- Independent enforced duration limits.
-- LiveKit telephony/media integration.
-- Telephone audio format handling.
-- Recording and timestamped transcripts.
-- Private encrypted object storage.
-- Authorized short-lived access to recordings.
-- Production interruption and reconnect behavior.
-- Real language evaluation.
-- Provider quota and concurrency handling.
-A successful browser test does not prove telephone quality or latency.
-Phase 5 — CRM, analysis, and automations
+- Call lifecycle events.
+- Authoritative connected-duration data.
+- Provider-enforced maximum duration.
+- Hang-up controls.
+- Retry/idempotency behavior.
+- Recording behavior.
+- Account-specific limits.
+Do not assume a generic outbound dialing API automatically supplies a usable bidirectional AI media path.
+If the intended integration is unsupported or unavailable on the account, report the exact gap and a concrete alternative before changing providers.
+Implement the call-control path
+Eligible lead
+    → Atomic funds reservation
+    → Durable dispatch
+    → Provider call creation
+    → LiveKit/voice session
+    → Provider call completion evidence
+    → Atomic settlement
+    → Post-call processing
+A provider timeout after submitting a call may mean the call was created. Reconcile ambiguous outcomes before retrying to prevent duplicate calls.
+Live-use boundary
+Use provider sandboxes and explicitly designated test numbers during development.
+Do not start real customer campaigns or spend customer funds merely to demonstrate an integration.
+Milestone 6 — Lead ingestion and campaign execution
 Implement:
-- Lead lists, filters, and detail pages.
-- Call history.
-- Transcript viewer and recording playback.
+- CSV upload and validation.
+- Import preview and row-level errors.
+- Authenticated lead-ingestion APIs.
+- Secure webhook/API credentials scoped to an organization.
+- Idempotency and external references.
+- Explicit duplicate-handling rules.
+- Consent capture.
+- Calling schedules and time zones.
+- Retry rules.
+- Per-organization and per-campaign concurrency.
+- Campaign pause/resume.
+- Durable execution state.
+Queue design
+Use Redis/BullMQ for job execution.
+PostgreSQL remains authoritative for business and financial state.
+Account for crashes between:
+- Committing a database change.
+- Adding a queue job.
+- Calling a provider.
+- Receiving the provider response.
+- Recording completion.
+Use a durable outbox or another explicit design that closes these gaps.
+Queue job IDs alone are not sufficient financial idempotency.
+Calling eligibility
+Before every attempt, recheck:
+- Organization and campaign status.
+- Consent and do-not-call state.
+- Calling window.
+- Retry eligibility.
+- Available concurrency.
+- Provider readiness.
+- Funds reservation.
+Support the approximately 30-second new-lead callback objective where these conditions permit.
+Milestone 7 — Recordings, transcripts, and post-call analysis
+Recordings
+- Record only under the applicable consent/notice policy.
+- Store recordings privately.
+- Use encryption and controlled retention.
+- Authorize access per organization.
+- Issue short-lived playback URLs.
+- Keep provider URLs and storage credentials out of public responses.
+- Define deletion and retention behavior.
+Transcripts
+Store:
+- Speaker.
+- Timestamp.
+- Text.
+- Relevant language metadata where available.
+Keep live partial transcript events distinct from the durable final transcript.
+Post-call analysis
+Produce validated structured results:
 - Qualification score from 1–10.
 - Hot/Warm/Cold classification.
-- Executive summaries.
+- Short summary.
 - Objections.
-- Campaign-specific extracted fields.
-- Authorized AI tools.
-- Mid-call WhatsApp brochure requests.
-- Outcome-based follow-ups.
-- Booking confirmations and calendar integration.
-- Analytics and reporting.
-Keep slow analysis and messaging outside the live audio path.
-WhatsApp consent is separate from voice consent. A phone call does not automatically establish a WhatsApp messaging window.
-Phase 6 — Production qualification and deployment
-Complete:
-- Deployment architecture and region selection.
-- Secure secrets management.
-- CI/CD.
-- Monitoring and alerts.
-- Provider cost and usage monitoring.
-- Backups and restore testing.
-- Recovery procedures.
-- Realistic load and concurrency tests.
-- Language and audio-quality evaluation.
-- Caller-perceived latency measurement.
-- Tenant authorization/security review.
-- Recording access and retention controls.
-- Provider registration and calling/messaging requirements.
-- Operational documentation.
-- Controlled rollout.
-Do not claim production readiness merely because builds and unit tests pass.
-17. Deliverable 3 acceptance checklist
-Before reporting Deliverable 3 complete, establish:
-- The Python worker module and entry point exist.
-- Configuration errors identify missing variable names without exposing secrets.
-- The pinned dependencies install reproducibly.
-- The worker joins the intended LiveKit room.
-- Browser microphone audio reaches realtime STT.
-- Final transcripts reach the configurable streaming LLM.
-- LLM output reaches streaming Bulbul v3 TTS.
-- Synthesized audio is audible in the browser.
-- Telugu, Hindi, Indian English, and code-switching are evaluated.
-- Caller interruption cancels obsolete generation.
-- Queued audio is cleared.
-- Late provider results cannot resume stale audio.
-- Timeouts, buffering limits, and overload behavior are explicit.
-- Provider failures are visible and handled.
-- Reconnect behavior is tested.
-- Shutdown closes streams, tasks, sessions, and connections.
-- Internal timing instrumentation works.
-- Caller-perceived timing is measured or clearly marked unmeasured.
-- Existing failing offline tests are resolved correctly.
-- Mocked and live results are reported separately.
-- Setup documentation contains tested startup commands.
-- Existing API/frontend/database/accounting behavior is preserved.
-- Work stops for review before the next phase.
-If credentials are unavailable, finish all credential-independent work and identify exactly which live checks remain blocked. Do not label blocked live acceptance as passed.
-18. Repository transfer and preservation
-The current working tree contains important uncommitted voice files.
-A copy of only the existing foundation commit will omit them.
-Give Claude access to:
-- Application and package source.
-- Voice source and browser files.
-- Tests.
-- package.json and package-lock.json.
-- pyproject.toml.
-- Migrations.
-- Infrastructure files.
-- Documentation.
-- .env.example.
-- This handoff.
-When transferring source to another environment, omit:
-- Real .env files and credentials.
-- node_modules.
-- Python .venv.
-- .next.
-- Generated caches.
-- Private recordings or customer data.
-Dependencies should be recreated from manifests and lockfiles.
-The local foundation commit was 2e315c0. No remote GitHub repository or deployment has been established in this handoff.
-19. Required final report after implementation
-When Deliverable 3 implementation is finished, report:
-1. Files created and changed.
-2. What now works.
-3. Exact startup commands.
-4. Required local environment variables.
-5. Actual checks executed and their results.
-6. Mocked versus live provider coverage.
-7. Remaining failures or blockers.
-8. Language-quality findings.
-9. Internal timing versus caller-perceived latency.
-10. Remaining limitations.
-11. The review checkpoint before the next phase.
-Immediate engineering priority: finish the missing Python voice worker and its integration using the existing partial work. The complete business platform remains the later roadmap.
+- Interest level.
+- Requested follow-up.
+- Campaign-specific captured fields.
+- Outcome.
+Treat extracted information as model output requiring validation.
+Do not invent facts absent from the conversation. Represent unknown values explicitly.
+Run analysis asynchronously, with retry and failure visibility.
+Milestone 8 — WhatsApp, tools, and bookings
+WhatsApp
+Implement Meta WhatsApp Cloud API integration for:
+- Approved template messages where required.
+- Brochures and relevant documents.
+- Authorized mid-call requests.
+- Post-call follow-ups.
+- Delivery status handling.
+- Webhook verification.
+- Consent and opt-out enforcement.
+- Durable message history.
+Voice consent and WhatsApp consent must remain separate.
+A telephone conversation does not automatically open a WhatsApp customer-service messaging window. Verify current Meta requirements during implementation.
+AI tools
+The model may request an action. The server must authorize it.
+Tools must not be able to:
+- Choose arbitrary organizations.
+- Change their own permissions.
+- Authorize wallet spending.
+- Send messages to arbitrary recipients.
+- Claim success before the action actually succeeds.
+Use idempotency for retryable tool requests.
+Bookings
+Choose and document the calendar integration.
+Implement:
+- Availability lookup.
+- Time-zone handling.
+- Conflict protection.
+- Booking creation.
+- Confirmation.
+- Cancellation/rescheduling.
+- Durable linkage to the lead and call.
+Do not present a generated calendar message as a confirmed booking.
+Milestone 9 — Operational and production readiness
+Before launch, complete:
+Reliability
+- Graceful shutdown.
+- Provider timeout policies.
+- Recovery from worker crashes.
+- Reconciliation of uncertain actions.
+- Queue recovery.
+- Database backups and restore procedures.
+- Incident/runbook documentation.
+Observability
+- Structured logs with secrets redacted.
+- Correlation between organization, campaign, lead, call, reservation, and provider event.
+- Provider failures and latency.
+- Queue backlog.
+- Wallet reconciliation failures.
+- Voice session failures.
+- Usage and cost monitoring.
+Avoid logging private conversation content unnecessarily.
+Security
+- Tenant authorization across APIs, jobs, tools, and storage.
+- Webhook verification.
+- Rate limits and abuse controls.
+- Secret management.
+- Least-privilege credentials.
+- Dependency review.
+- Secure deployment configuration.
+- Recording/transcript access controls.
+Deployment
+- Decide the deployment topology.
+- Prefer India/Mumbai placement where supported.
+- Document every service and dependency.
+- Configure HTTPS and production media networking.
+- Configure monitoring and backups.
+- Keep local development settings separate from production.
+- Establish a controlled rollout process.
+Acceptance evidence
+Report actual results for:
+- Authentication.
+- Tenant isolation.
+- Concurrent accounting.
+- Duplicate provider events.
+- Campaign recovery.
+- Telephone audio.
+- Multilingual quality.
+- Interruption handling.
+- Caller-perceived latency.
+- Capacity.
+Mark anything not verified as unverified.
+6. Database and migration rules
+Preserve existing protections:
+- Forced RLS.
+- Restricted runtime role.
+- Separate migration credentials.
+- Transaction-local tenant context.
+- Composite tenant foreign keys.
+- Integer-paise accounting.
+- Immutable financial snapshots.
+- Append-only ledger.
+- Reservation lifecycle guards.
+Add new tables only as needed, potentially including:
+- Authentication/session records.
+- Reusable agent configurations.
+- Payment orders and provider events.
+- Durable outbox/jobs.
+- Notifications.
+- Messages.
+- Bookings.
+- Audit records.
+Define ownership, lifecycle, idempotency, retention, indexes, and authorization for each.
+Use versioned migrations. Do not replace migrations with an unreviewed schema push.
+Never reset the application database to make a migration easier.
+7. Definition of “complete”
+A feature is complete only when:
+1. Its real backend behavior exists.
+2. Authorization and tenant isolation are enforced.
+3. The UI uses the real API.
+4. Validation and failure behavior are implemented.
+5. Durable state and retries are handled where needed.
+6. Configuration is documented.
+7. Verification status is honestly reported.
+8. No placeholder behavior is being presented as functionality.
+A provider integration requiring missing credentials may be implemented but still live-unverified. Say so explicitly.
+Do not use one broad “project complete” label to hide unfinished external integrations.
+8. How to begin
+Start with these actions:
+1. Inspect the current repository.
+2. Identify what is actually implemented versus described only in documentation.
+3. Preserve the working browser voice path.
+4. Create a project status document mapping each milestone to:
+   - Implemented.
+   - Partially implemented.
+   - Missing.
+   - Blocked by account/configuration.
+   - Verified or unverified.
+5. Establish the authentication/API contracts needed by the website.
+6. Implement the authenticated application shell and the first real campaign/lead workflows.
+7. Continue through the milestones in dependency order.
+Do not begin with an isolated cosmetic redesign.
+Do not repeatedly ask for permission for routine local implementation. Ask only when a missing business decision, external account requirement, or consequential external action genuinely requires the owner.
+9. Required progress and completion reports
+For each milestone, report:
+- What changed.
+- Actual file locations.
+- What the user can now do.
+- Startup instructions.
+- Configuration required.
+- What was manually verified.
+- Which automated tests were not run.
+- Which live provider checks remain.
+- Known limitations.
+- The next concrete milestone.
+The objective is a usable, secure business product built around the working voice prototype—not merely a prettier demo.

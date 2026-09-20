@@ -15,6 +15,13 @@
       "when": 1789461380780,
       "tag": "0001_tenant_security",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1758470400000,
+      "tag": "0002_agent_configs",
+      "breakpoints": true
     }
   ]
 }

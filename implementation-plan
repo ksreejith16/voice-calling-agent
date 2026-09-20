@@ -1,0 +1,612 @@
+India Voice Platform — Phase 2 Implementation Plan
+
+ Context
+
+ The voice prototype is confirmed working (user tested
+ it — AI voice spoke, user's voice was captured
+ correctly). The codebase has:
+ - ✅ Full voice worker (LiveKit v1.13.7 + Sarvam
+ STT/TTS + Silero VAD) — working
+ - ✅ Production-grade PostgreSQL schema (8 tables,
+ RLS, triggers, billing math library)
+ - ✅ Redis + LiveKit in Docker compose
+ - ✅ Static landing page + setup guide (2 web pages)
+ - ✅ API health/readiness endpoints only (2
+ endpoints)
+ - ❌ No auth, no business endpoints, no real
+ dashboard, no campaigns, no billing
+
+ Goal: implement the product milestone by milestone
+ per the file document. Preserve working voice
+ prototype throughout.
+
+ Working voice config (must not change):
+ - LiveKit server: v1.13.7, JS client 2.17.0, Agents
+ 1.8.1
+ - STT: Sarvam STTRealtime / Saaras:v3-realtime
+ - TTS: Sarvam Bulbul:v3
+ - LLM: Groq openai/gpt-oss-20b with
+ reasoning_effort="low", include_reasoning=False
+ - Browser uses text-stream transcription (not legacy
+ transcription events)
+
+ ---
+ Milestone 1 — Stabilize Voice Baseline (30 min)
+
+ Mostly done from previous session. Two small
+ remaining items:
+
+ 1. Update apps/web/app/setup/page.tsx — the "Voice
+ implementation waits for your review" checkpoint
+ panel still says D3 is pending. Change to reflect it
+ is now implemented and working, with startup
+ commands.
+ 2. Verify infra/compose.yaml --keys format —
+ currently "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_
+ SECRET:-devsecret-which-must-be-at-least-32-chars}".
+ Test that Docker Compose variable substitution
+ produces a valid key: secret string. Fix if the
+ format is wrong.
+
+ No voice worker changes.
+
+ ---
+ Milestone 2 — Authentication and Organizations
+
+ Auth provider: Clerk (recommended — managed OIDC,
+ best Next.js SDK, free for early stage, matches
+ auth_issuer/auth_subject DB column design). Requires
+ free Clerk account.
+
+ Alternative if user prefers no external account:
+ Better-Auth (open source, self-hosted).
+
+ NestJS API changes (apps/api/src/)
+
+ New modules/files:
+ - auth/ — JWT middleware verifying Clerk JWKS;
+ @CurrentUser() decorator; RolesGuard
+ - organizations/organizations.controller.ts +
+ organizations.service.ts — POST /orgs (provision org
+ + wallet on first sign-in), GET /orgs/me
+ - users/users.controller.ts + users.service.ts — GET
+ /users/me, PATCH /users/me
+ - agents/agents.controller.ts + agents.service.ts —
+ CRUD for reusable voice agent configurations
+
+ All endpoints use withTenantTransaction from
+ packages/database for RLS context. JWT guard on all
+ business routes.
+
+ New dependencies to add to apps/api/package.json:
+ jwks-rsa, passport-jwt, @nestjs/passport
+
+ Database migration
+
+ packages/database/drizzle/0002_agent_configs.sql —
+ new agent_configs table:
+ - id, org_id (FK), name, language enum, voice
+ (speaker name), instructions_text, created_at,
+ updated_at
+ - RLS + grants matching existing table pattern from
+ 0001_tenant_security.sql
+
+ Next.js changes (apps/web/)
+
+ - Install @clerk/nextjs
+ - apps/web/middleware.ts — protect /dashboard/*,
+ redirect unauthenticated to /sign-in
+ - apps/web/app/(auth)/sign-in/[[...sign-in]]/page.tsx
+ — Clerk embedded sign-in
+ - apps/web/app/(auth)/sign-up/[[...sign-up]]/page.tsx
+ — Clerk sign-up
+ - Update apps/web/app/layout.tsx with <ClerkProvider>
+ - Add NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY +
+ CLERK_SECRET_KEY to env
+
+ ---
+ Milestone 3 — Real Dashboard
+
+ Replace the 2-page static app with an 8-section
+ authenticated dashboard. Reuse and extend AppShell.
+
+ New routes (all under apps/web/app/(dashboard)/)
+
+ Route: /dashboard
+ Page: Overview — wallet balance, active campaigns,
+ recent calls, provider status
+ Data source: New GET /dashboard/overview API
+ ────────────────────────────────────────
+ Route: /dashboard/agents
+ Page: List + create/edit voice agent configs
+ Data source: GET/POST/PATCH /agents
+ ────────────────────────────────────────
+ Route: /dashboard/campaigns
+ Page: Campaign list, creation wizard
+ Data source: GET/POST /campaigns
+ ────────────────────────────────────────
+ Route: /dashboard/leads
+ Page: Lead list, CSV upload, filters
+ Data source: GET/POST /leads
+ ────────────────────────────────────────
+ Route: /dashboard/calls
+ Page: Call history, transcript viewer
+ Data source: GET /calls
+ ────────────────────────────────────────
+ Route: /dashboard/wallet
+ Page: Balance, transaction history
+ Data source: GET /wallet
+ ────────────────────────────────────────
+ Route: /dashboard/integrations
+ Page: Provider status (truthful:
+ configured/verified/missing)
+ Data source: GET /integrations/status
+ ────────────────────────────────────────
+ Route: /dashboard/settings
+ Page: Org settings, team members
+ Data source: GET/PATCH /orgs/me
+
+ New API modules (apps/api/src/)
+
+ - campaigns/ — list, create, update, pause/resume
+ - leads/ — list with filters, create, CSV upload
+ - call-logs/ — list with filters, transcript fetch
+ - wallet/ — balance read, transaction list
+ - dashboard/ — overview stats aggregated query
+
+ All use withTenantTransaction + JWT guard + role
+ checks.
+
+ New UI components (apps/web/components/)
+
+ - StatCard — for wallet amount, campaign count, etc.
+ - DataTable — sortable/filterable table (leads,
+ calls, transactions)
+ - StatusBadge — campaign/call/lead status chips with
+ colors
+ - EmptyState — explains how to get started per
+ section
+ - AgentConfigForm — voice agent settings form with
+ live voice preview button (opens browser harness)
+
+ ---
+ Milestone 4 — Prepaid Billing (Razorpay)
+
+ Implement after dashboard is working.
+
+ - POST /wallet/topup/order — create Razorpay order,
+ store it
+ - POST /wallet/topup/webhook — verify Razorpay HMAC
+ signature on raw body, credit wallet idempotently
+ - BullMQ job: reconcile expired payment orders
+ - New migration: 0003_payment_orders.sql
+
+ ---
+ Milestones 5–9 — Future phases
+
+ Will be planned when Milestones 1–4 complete.
+ Milestone 5 (Exotel telephony) requires verifying
+ actual account SIP/media capabilities before any
+ implementation.
+
+ ---
+ Implementation Order This Session
+
+ 1. Milestone 1 — setup page + compose.yaml verify (30
+ min)
+ 2. Milestone 2 — auth (Clerk or Better-Auth per user
+ choice) + org/user/agent API (2–3 hours)
+ 3. Milestone 3 partial — dashboard layout + Overview
+ + Agents pages with real API data (2–3 hours)
+
+ Constraint: do not change voice worker behavior.
+ Config documentation updates are fine.
+
+ ---
+ Key Files
+
+ File: apps/web/app/setup/page.tsx
+ Action: Update D3 panel to "implemented and working"
+ ────────────────────────────────────────
+ File: apps/web/middleware.ts
+ Action: New — protect /dashboard/*
+ ────────────────────────────────────────
+ File: apps/web/app/layout.tsx
+ Action: Add ClerkProvider
+ ────────────────────────────────────────
+ File: apps/web/app/(auth)/sign-in/
+ Action: New sign-in page
+ ────────────────────────────────────────
+ File: apps/web/app/(dashboard)/
+ Action: New route group with 8 sections
+ ────────────────────────────────────────
+ File: apps/web/components/
+ Action: New shared UI components
+ ────────────────────────────────────────
+ File: apps/api/src/auth/
+ Action: New JWT middleware + guards
+ ────────────────────────────────────────
+ File: apps/api/src/organizations/
+ Action: New module
+ ────────────────────────────────────────
+ File: apps/api/src/users/
+ Action: New module
+ ────────────────────────────────────────
+ File: apps/api/src/agents/
+ Action: New module
+ ────────────────────────────────────────
+ File: apps/api/src/campaigns/
+ Action: New module
+ ────────────────────────────────────────
+ File: apps/api/src/leads/
+ Action: New module
+ ────────────────────────────────────────
+ File: apps/api/src/call-logs/
+ Action: New module
+ ────────────────────────────────────────
+ File: apps/api/src/wallet/
+ Action: New module
+ ────────────────────────────────────────
+ File: apps/api/src/dashboard/
+ Action: New overview aggregation
+ ────────────────────────────────────────
+ File:
+ packages/database/drizzle/0002_agent_configs.sql
+ Action: New migration
+
+ ---
+ Verification
+
+ - Source inspection after each section
+ - npm.cmd run dev — confirm all pages load, no
+ console errors
+ - Manual: sign in → see dashboard → create an agent
+ config → create a campaign
+ - No automated test runs (per user preference)
+ - Live provider checks skipped until credentials are
+
+● Clerk it is. The plan is ready.
+
+● User approved Claude's plan
+  ⎿  Plan saved to: ~\.claude\plans\go-thorugh-the-file
+     -valiant-cray.md · /plan to edit
+     India Voice Platform — Phase 2 Implementation Plan
+
+     Context
+
+     The voice prototype is confirmed working (user
+     tested it — AI voice spoke, user's voice was
+     captured correctly). The codebase has:
+     - ✅ Full voice worker (LiveKit v1.13.7 + Sarvam
+     STT/TTS + Silero VAD) — working
+     - ✅ Production-grade PostgreSQL schema (8 tables,
+     RLS, triggers, billing math library)
+     - ✅ Redis + LiveKit in Docker compose
+     - ✅ Static landing page + setup guide (2 web
+     pages)
+     - ✅ API health/readiness endpoints only (2
+     endpoints)
+     - ❌ No auth, no business endpoints, no real
+     dashboard, no campaigns, no billing
+
+     Goal: implement the product milestone by milestone
+     per the file document. Preserve working voice
+     prototype throughout.
+
+     Working voice config (must not change):
+     - LiveKit server: v1.13.7, JS client 2.17.0,
+     Agents 1.8.1
+     - STT: Sarvam STTRealtime / Saaras:v3-realtime
+     - TTS: Sarvam Bulbul:v3
+     - LLM: Groq openai/gpt-oss-20b with
+     reasoning_effort="low", include_reasoning=False
+     - Browser uses text-stream transcription (not
+     legacy transcription events)
+
+     ---
+     Milestone 1 — Stabilize Voice Baseline (30 min)
+
+     Mostly done from previous session. Two small
+     remaining items:
+
+     1. Update apps/web/app/setup/page.tsx — the "Voice
+     implementation waits for your review" checkpoint
+     panel still says D3 is pending. Change to reflect
+     it is now implemented and working, with startup
+     commands.
+     2. Verify infra/compose.yaml --keys format —
+     currently "${LIVEKIT_API_KEY:-devkey}:
+     ${LIVEKIT_API_SECRET:-devsecret-which-must-be-at-l
+     east-32-chars}". Test that Docker Compose variable
+     substitution produces a valid key: secret string.
+     Fix if the format is wrong.
+
+     No voice worker changes.
+
+     ---
+     Milestone 2 — Authentication and Organizations
+
+     Auth provider: Clerk (recommended — managed OIDC,
+     best Next.js SDK, free for early stage, matches
+     auth_issuer/auth_subject DB column design).
+     Requires free Clerk account.
+
+     Alternative if user prefers no external account:
+     Better-Auth (open source, self-hosted).
+
+     NestJS API changes (apps/api/src/)
+
+     New modules/files:
+     - auth/ — JWT middleware verifying Clerk JWKS;
+     @CurrentUser() decorator; RolesGuard
+     - organizations/organizations.controller.ts +
+     organizations.service.ts — POST /orgs (provision
+     org + wallet on first sign-in), GET /orgs/me
+     - users/users.controller.ts + users.service.ts —
+     GET /users/me, PATCH /users/me
+     - agents/agents.controller.ts + agents.service.ts
+     — CRUD for reusable voice agent configurations
+
+     All endpoints use withTenantTransaction from
+     packages/database for RLS context. JWT guard on
+     all business routes.
+
+     New dependencies to add to apps/api/package.json:
+     jwks-rsa, passport-jwt, @nestjs/passport
+
+     Database migration
+
+     packages/database/drizzle/0002_agent_configs.sql —
+     new agent_configs table:
+     - id, org_id (FK), name, language enum, voice
+     (speaker name), instructions_text, created_at,
+     updated_at
+     - RLS + grants matching existing table pattern
+     from 0001_tenant_security.sql
+
+     Next.js changes (apps/web/)
+
+     - Install @clerk/nextjs
+     - apps/web/middleware.ts — protect /dashboard/*,
+     redirect unauthenticated to /sign-in
+     - apps/web/app/(auth)/sign-in/[[...sign-in]]/page.
+     tsx — Clerk embedded sign-in
+     - apps/web/app/(auth)/sign-up/[[...sign-up]]/page.
+     tsx — Clerk sign-up
+     - Update apps/web/app/layout.tsx with
+     <ClerkProvider>
+     - Add NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY +
+     CLERK_SECRET_KEY to env
+
+     ---
+     Milestone 3 — Real Dashboard
+
+     Replace the 2-page static app with an 8-section
+     authenticated dashboard. Reuse and extend
+     AppShell.
+
+     New routes (all under apps/web/app/(dashboard)/)
+
+     Route: /dashboard
+     Page: Overview — wallet balance, active campaigns,
+
+     recent calls, provider status
+     Data source: New GET /dashboard/overview API
+     ────────────────────────────────────────
+     Route: /dashboard/agents
+     Page: List + create/edit voice agent configs
+     Data source: GET/POST/PATCH /agents
+     ────────────────────────────────────────
+     Route: /dashboard/campaigns
+     Page: Campaign list, creation wizard
+     Data source: GET/POST /campaigns
+     ────────────────────────────────────────
+     Route: /dashboard/leads
+     Page: Lead list, CSV upload, filters
+     Data source: GET/POST /leads
+     ────────────────────────────────────────
+     Route: /dashboard/calls
+     Page: Call history, transcript viewer
+     Data source: GET /calls
+     ────────────────────────────────────────
+     Route: /dashboard/wallet
+     Page: Balance, transaction history
+     Data source: GET /wallet
+     ────────────────────────────────────────
+     Route: /dashboard/integrations
+     Page: Provider status (truthful:
+     configured/verified/missing)
+     Data source: GET /integrations/status
+     ────────────────────────────────────────
+     Route: /dashboard/settings
+     Page: Org settings, team members
+     Data source: GET/PATCH /orgs/me
+
+     New API modules (apps/api/src/)
+
+     - campaigns/ — list, create, update, pause/resume
+     - leads/ — list with filters, create, CSV upload
+     - call-logs/ — list with filters, transcript fetch
+     - wallet/ — balance read, transaction list
+     - dashboard/ — overview stats aggregated query
+
+     All use withTenantTransaction + JWT guard + role
+     checks.
+
+     New UI components (apps/web/components/)
+
+     - StatCard — for wallet amount, campaign count,
+     etc.
+     - DataTable — sortable/filterable table (leads,
+     calls, transactions)
+     - StatusBadge — campaign/call/lead status chips
+     with colors
+     - EmptyState — explains how to get started per
+     section
+     - AgentConfigForm — voice agent settings form with
+     live voice preview button (opens browser harness)
+
+     ---
+     Milestone 4 — Prepaid Billing (Razorpay)
+
+     Implement after dashboard is working.
+
+     - POST /wallet/topup/order — create Razorpay
+     order, store it
+     - POST /wallet/topup/webhook — verify Razorpay
+     HMAC signature on raw body, credit wallet
+     idempotently
+     - BullMQ job: reconcile expired payment orders
+     - New migration: 0003_payment_orders.sql
+
+     ---
+     Milestones 5–9 — Future phases
+
+     Will be planned when Milestones 1–4 complete.
+     Milestone 5 (Exotel telephony) requires verifying
+     actual account SIP/media capabilities before any
+     implementation.
+
+     ---
+     Implementation Order This Session
+
+     1. Milestone 1 — setup page + compose.yaml verify
+     (30 min)
+     2. Milestone 2 — auth (Clerk or Better-Auth per
+     user choice) + org/user/agent API (2–3 hours)
+     3. Milestone 3 partial — dashboard layout +
+     Overview + Agents pages with real API data (2–3
+     hours)
+
+     Constraint: do not change voice worker behavior.
+     Config documentation updates are fine.
+
+     ---
+     Key Files
+
+     File: apps/web/app/setup/page.tsx
+     Action: Update D3 panel to "implemented and
+     working"
+     ────────────────────────────────────────
+     File: apps/web/middleware.ts
+     Action: New — protect /dashboard/*
+     ────────────────────────────────────────
+     File: apps/web/app/layout.tsx
+     Action: Add ClerkProvider
+     ────────────────────────────────────────
+     File: apps/web/app/(auth)/sign-in/
+     Action: New sign-in page
+     ────────────────────────────────────────
+     File: apps/web/app/(dashboard)/
+     Action: New route group with 8 sections
+     ────────────────────────────────────────
+     File: apps/web/components/
+     Action: New shared UI components
+     ────────────────────────────────────────
+     File: apps/api/src/auth/
+     Action: New JWT middleware + guards
+     ────────────────────────────────────────
+     File: apps/api/src/organizations/
+     Action: New module
+     ────────────────────────────────────────
+     File: apps/api/src/users/
+     Action: New module
+     ────────────────────────────────────────
+     File: apps/api/src/agents/
+     Action: New module
+     ────────────────────────────────────────
+     File: apps/api/src/campaigns/
+     Action: New module
+     ────────────────────────────────────────
+     File: apps/api/src/leads/
+     Action: New module
+     ────────────────────────────────────────
+     File: apps/api/src/call-logs/
+     Action: New module
+     ────────────────────────────────────────
+     File: apps/api/src/wallet/
+     Action: New module
+     ────────────────────────────────────────
+     File: apps/api/src/dashboard/
+     Action: New overview aggregation
+     ────────────────────────────────────────
+     File:
+     packages/database/drizzle/0002_agent_configs.sql
+     Action: New migration
+
+     ---
+     Verification
+
+     - Source inspection after each section
+     - npm.cmd run dev — confirm all pages load, no
+     console errors
+     - Manual: sign in → see dashboard → create an
+     agent config → create a campaign
+     - No automated test runs (per user preference)
+     - Live provider checks skipped until credentials
+     are in place
+
+
+
+
+things done :
+ What was built
+
+  Milestone 1 — Setup page updated to say D3 is
+  working.
+
+  Milestone 2 — Authentication (Clerk)
+  - apps/web/middleware.ts — all /dashboard/* routes
+  protected, redirects to sign-in
+  - apps/web/app/(auth)/sign-in/ + sign-up/ — Clerk
+  sign-in/sign-up pages
+  - apps/web/app/onboarding/ — first-time org setup
+  form
+  - NestJS ClerkAuthGuard — verifies every API request
+  using Clerk's JWT
+  - POST /auth/provision — creates your org + wallet in
+  our database on first login
+  - GET /auth/me — returns your org and wallet info
+
+  Milestone 3 — Real Dashboard
+  - 8 pages: Overview, Agents, Campaigns, Leads, Calls,
+  Wallet, Integrations, Settings
+  - All pages show real data from the PostgreSQL
+  database
+  - Agent creation form at /dashboard/agents/new
+  - Campaign creation form at /dashboard/campaigns/new
+
+  New database migration — agent_configs table + two
+  auth helper SQL functions
+
+  ---
+  Steps to activate (do these in order)
+
+  Step 1 — Get Clerk keys (5 minutes)
+  1. Go to https://clerk.com → create a free account
+  2. Click Create application → name it "India Voice" →
+  choose Email as sign-in method
+  3. Copy Publishable key (starts pk_test_...) and
+  Secret key (starts sk_test_...)
+
+  Step 2 — Add to your .env file
+  AUTH_MODE=clerk
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+  CLERK_SECRET_KEY=sk_test_...
+
+  Step 3 — Apply the new database migration
+  npm.cmd run db:migrate
+  This creates the agent_configs table and the auth
+  helper functions.
+
+  Step 4 — Start everything
+  # Window 1 — infrastructure
+  npm.cmd run infra:up
+
+  # Window 2 — API + web
+  npm.cmd run dev
+
+  Step 5 — Open the browser
+  Go to http://localhost:3000 → click Sign in → create
+  your account → fill in your business name → you'll
+  land on the real dashboard.

@@ -18,6 +18,8 @@ const tenantTables = [
 export class Infrastructure implements DependencyChecks {
   private readonly database: ReturnType<typeof createDatabase>;
 
+  getDb() { return this.database.db; }
+
   constructor(private readonly config: AppConfig) {
     this.database = createDatabase({
       connectionString: config.DATABASE_URL,

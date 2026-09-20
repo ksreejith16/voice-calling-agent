@@ -28,24 +28,24 @@ const environmentSchema = z.object({
   WEB_ORIGIN: httpOrigin.default('http://localhost:3000'),
   DATABASE_URL: runtimeDatabaseUrl,
   REDIS_URL: redisUrl,
-  AUTH_MODE: z.literal('disabled').default('disabled'),
+  AUTH_MODE: z.enum(['disabled', 'clerk']).default('disabled'),
+  CLERK_SECRET_KEY: z.string().min(1).optional(),
+  CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
 }).superRefine((value, context) => {
-  if (value.NODE_ENV === 'production') {
+  if (value.AUTH_MODE === 'clerk' && !value.CLERK_SECRET_KEY) {
     context.addIssue({
       code: 'custom',
-      path: ['AUTH_MODE'],
-      message: 'production startup requires a future implemented authentication adapter; this scaffold supports development/test only',
+      path: ['CLERK_SECRET_KEY'],
+      message: 'CLERK_SECRET_KEY is required when AUTH_MODE=clerk',
     });
   }
 });
 
 export type AppConfig = Readonly<z.infer<typeof environmentSchema>>;
 
-/** Only explicitly selected server settings are returned. Migration credentials are never read. */
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
   const result = environmentSchema.safeParse(environment);
   if (!result.success) {
-    // Report field names and requirements, never the supplied values or connection credentials.
     throw new Error(`Invalid API configuration: ${result.error.issues
       .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
       .join('; ')}`);

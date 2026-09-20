@@ -11,11 +11,16 @@ export async function createApp(
   quiet = false,
 ): Promise<NestFastifyApplication> {
   const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule.register(dependencies),
-    new FastifyAdapter({ bodyLimit: 64 * 1024, trustProxy: false }),
+    AppModule.register(dependencies, config),
+    new FastifyAdapter({ bodyLimit: 2 * 1024 * 1024, trustProxy: false }),
     { logger: quiet ? false : ['log', 'warn', 'error'], abortOnError: false },
   );
-  app.enableCors({ origin: config.WEB_ORIGIN, methods: ['GET', 'HEAD'], credentials: false });
+  app.enableCors({
+    origin: config.WEB_ORIGIN,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
+    credentials: false,
+  });
   app.enableShutdownHooks();
   await app.init();
   await app.getHttpAdapter().getInstance().ready();

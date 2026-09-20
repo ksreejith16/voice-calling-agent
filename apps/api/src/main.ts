@@ -13,7 +13,6 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  // Configuration messages are explicitly redacted in loadConfig. Unexpected errors stay generic.
   console.error(error instanceof Error && error.message.startsWith('Invalid API configuration:')
     ? error.message
     : 'API startup failed. Check the configured host/port and local service setup.');

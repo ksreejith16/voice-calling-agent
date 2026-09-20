@@ -2,7 +2,18 @@ import {
   Controller, Get, Header, Inject, Module, ServiceUnavailableException,
   type DynamicModule,
 } from '@nestjs/common';
-import { INFRASTRUCTURE, type DependencyChecks } from './infrastructure';
+import { INFRASTRUCTURE, type DependencyChecks, type Infrastructure } from './infrastructure';
+import { DATABASE } from './database.token';
+import { APP_CONFIG } from './config.token';
+import type { AppConfig } from './config';
+import { ClerkAuthGuard } from './auth/clerk.guard';
+import { ProvisionController } from './auth/provision.controller';
+import { AgentsController } from './agents/agents.controller';
+import { CampaignsController } from './campaigns/campaigns.controller';
+import { LeadsController } from './leads/leads.controller';
+import { CallLogsController } from './call-logs/call-logs.controller';
+import { WalletController } from './wallet/wallet.controller';
+import { DashboardController } from './dashboard/dashboard.controller';
 
 @Controller()
 class HealthController {
@@ -11,7 +22,7 @@ class HealthController {
   @Get('health')
   @Header('Cache-Control', 'no-store')
   health() {
-    return { status: 'ok', service: 'india-voice-api', phase: 'foundation' };
+    return { status: 'ok', service: 'india-voice-api', phase: 'auth+dashboard' };
   }
 
   @Get('ready')
@@ -34,11 +45,28 @@ class HealthController {
 
 @Module({})
 export class AppModule {
-  static register(dependencies: DependencyChecks): DynamicModule {
+  static register(dependencies: DependencyChecks, config: AppConfig): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController],
-      providers: [{ provide: INFRASTRUCTURE, useValue: dependencies }],
+      controllers: [
+        HealthController,
+        ProvisionController,
+        AgentsController,
+        CampaignsController,
+        LeadsController,
+        CallLogsController,
+        WalletController,
+        DashboardController,
+      ],
+      providers: [
+        { provide: INFRASTRUCTURE, useValue: dependencies },
+        {
+          provide: DATABASE,
+          useFactory: () => (dependencies as Infrastructure).getDb(),
+        },
+        { provide: APP_CONFIG, useValue: config },
+        ClerkAuthGuard,
+      ],
     };
   }
 }

@@ -291,6 +291,24 @@ export const walletTransactions = pgTable('wallet_transactions', {
   check('wallet_transactions_audit_nonempty', sql`length(trim(${table.idempotencyKey})) > 0 AND length(trim(${table.description})) > 0`),
 ]);
 
+export const agentConfigs = pgTable('agent_configs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: tenantId(),
+  name: varchar('name', { length: 200 }).notNull(),
+  description: text('description').notNull().default(''),
+  language: supportedLanguage('language').notNull().default('en-IN'),
+  voice: varchar('voice', { length: 100 }),
+  instructions: text('instructions').notNull().default(''),
+  openingMessage: text('opening_message').notNull().default(''),
+  status: varchar('status', { length: 20 }).notNull().default('active'),
+  ...auditColumns(),
+}, (table) => [
+  unique('agent_configs_org_id_unique').on(table.organizationId, table.id),
+  index('agent_configs_org_status_idx').on(table.organizationId, table.status),
+  check('agent_configs_name_nonempty', sql`length(trim(${table.name})) > 0`),
+  check('agent_configs_status_valid', sql`${table.status} IN ('active', 'archived')`),
+]);
+
 export const organizationsRelations = relations(organizations, ({ many, one }) => ({
   users: many(users), wallet: one(wallets), campaigns: many(campaigns), leads: many(leads), calls: many(callLogs),
 }));

@@ -26,6 +26,7 @@ class Settings(BaseModel):
     llm_base_url: str
     llm_api_key: SecretStr
     llm_model: str = Field(min_length=1, max_length=200)
+    llm_max_completion_tokens: int = Field(default=2048, ge=128, le=8192)
     voice_agent_name: str = Field(default="india-voice-prototype", pattern=r"^[a-z][a-z0-9-]{0,63}$")
     voice_language: Literal["te-IN", "hi-IN", "en-IN", "te-en"] = "en-IN"
     sarvam_stt_language: Literal["auto", "te-IN", "hi-IN", "en-IN"] = "auto"

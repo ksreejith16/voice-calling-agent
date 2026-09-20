@@ -1,0 +1,30 @@
+{
+  "kind": "browser_diagnostics",
+  "endpointLatencyMeasured": false,
+  "events": [
+    {
+      "time": "2026-09-19T20:30:28.366Z",
+      "elapsedMs": 480,
+      "event": "page_ready",
+      "detail": "No voice latency measurement is inferred from browser events"
+    },
+    {
+      "time": "2026-09-19T20:30:29.676Z",
+      "elapsedMs": 1789,
+      "event": "dispatch_requested",
+      "detail": "Waiting for a worker to join"
+    },
+    {
+      "time": "2026-09-19T20:30:29.940Z",
+      "elapsedMs": 2053,
+      "event": "disconnected",
+      "detail": ""
+    },
+    {
+      "time": "2026-09-19T20:30:29.954Z",
+      "elapsedMs": 2068,
+      "event": "room_cleanup_confirmed",
+      "detail": ""
+    }
+  ]
+}

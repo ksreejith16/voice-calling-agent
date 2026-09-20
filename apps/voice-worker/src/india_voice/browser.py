@@ -246,7 +246,7 @@ def create_app(config: BrowserConfig, *, livekit_client: Any = None) -> web.Appl
             "Referrer-Policy": "no-referrer",
             "Cross-Origin-Resource-Policy": "same-origin",
             "Permissions-Policy": "microphone=(self), camera=(), display-capture=()",
-            "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' ws: wss: https:; media-src 'self' blob:; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+            "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' ws: wss: https: http://127.0.0.1:7880; media-src 'self' blob:; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
         })
         return response
 
@@ -303,6 +303,10 @@ def create_app(config: BrowserConfig, *, livekit_client: Any = None) -> web.Appl
     async def health(_request: web.Request) -> web.Response:
         return web.json_response({"status": "ok", "service": "india-voice-browser", "providerConnectivityVerified": False})
 
+    async def favicon(_request: web.Request) -> web.Response:
+        # Browsers request this automatically; no icon is needed by the harness.
+        return web.Response(status=204)
+
     async def asset(request: web.Request) -> web.FileResponse:
         routes = {
             "/": BROWSER_ROOT / "index.html",
@@ -317,6 +321,7 @@ def create_app(config: BrowserConfig, *, livekit_client: Any = None) -> web.Appl
 
     app.cleanup_ctx.append(lifecycle)
     app.router.add_get("/health", health)
+    app.router.add_get("/favicon.ico", favicon)
     app.router.add_post("/session", start_session)
     app.router.add_post("/session/end", end_session)
     for path in ("/", "/app.js", "/styles.css", "/vendor/livekit-client.umd.js"):

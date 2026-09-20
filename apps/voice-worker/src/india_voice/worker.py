@@ -12,6 +12,7 @@ import asyncio
 import logging
 import uuid
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, cli
@@ -28,6 +29,12 @@ class IndiaVoiceAgent(Agent):
     """Conversational agent using the configured OpenAI-compatible LLM."""
 
     def __init__(self, settings: Settings) -> None:
+        model_options = {}
+        if (urlsplit(settings.llm_base_url).hostname == "api.groq.com"
+                and settings.llm_model in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}):
+            # Groq GPT-OSS uses include_reasoning, not reasoning_format. Keep
+            # reasoning out of speech and leave token room for the final answer.
+            model_options = {"reasoning_effort": "low", "extra_body": {"include_reasoning": False}}
         super().__init__(
             instructions=settings.instructions(),
             llm=oai_plugin.LLM(
@@ -36,9 +43,10 @@ class IndiaVoiceAgent(Agent):
                 base_url=settings.llm_base_url,
                 # Enforce provider timeout so a slow LLM cannot stall the pipeline.
                 timeout=httpx.Timeout(settings.voice_provider_timeout_seconds),
-                # Approximate the character budget as a token ceiling.
-                # ~3 chars/token is conservative for mixed-script Indian text.
-                max_completion_tokens=settings.voice_max_output_characters // 3,
+                # Provider completion tokens include reasoning; a character-based
+                # estimate can exhaust the budget before any spoken answer.
+                max_completion_tokens=settings.llm_max_completion_tokens,
+                **model_options,
             ),
         )
 

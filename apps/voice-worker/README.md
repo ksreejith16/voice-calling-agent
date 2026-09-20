@@ -64,6 +64,16 @@ configured in `infra/compose.yaml` for the local LiveKit server.
 The browser harness only needs the LiveKit variables. A complete voice conversation
 also requires the Sarvam and LLM credentials.
 
+For Groq, use `LLM_BASE_URL=https://api.groq.com/openai/v1` and
+`LLM_MODEL=openai/gpt-oss-20b`. Groq retired `llama-3.1-8b-instant` for free and
+developer accounts on 16 August 2026; requests to it can return `model_not_found`.
+See [Groq's migration notice](https://console.groq.com/docs/deprecations).
+The worker uses low reasoning effort and excludes reasoning from the spoken
+response for Groq GPT-OSS. `LLM_MAX_COMPLETION_TOKENS` defaults to 2048 because
+the provider's limit includes both reasoning and final-answer tokens; it is not
+a character limit. The browser renders the text-stream transcription channel
+only, avoiding duplicate rows from simultaneous legacy transcription events.
+
 ### 3. Start the infrastructure
 
 ```powershell
@@ -71,6 +81,27 @@ npm.cmd run infra:up
 ```
 
 This starts PostgreSQL, Redis, and the local LiveKit server via Docker Compose.
+
+The local server is pinned to **LiveKit 1.13.7**, compatible with the installed
+JavaScript client 2.17.0 and its `/rtc/v1` signaling route. Browser, worker, and
+Docker Desktop run on the same computer: signaling uses `127.0.0.1:7880`, with
+media on TCP 7881 and UDP 7882. A hardcoded Wi-Fi IP can stop working when the
+computer changes networks, so this local setup advertises loopback instead.
+
+After pulling changes to the LiveKit configuration, update the running container:
+
+```powershell
+docker compose --env-file .env -f infra/compose.yaml up -d --no-deps livekit
+```
+
+An old `v1.8.0` container returns 404 for `/rtc/v1/validate`. The JavaScript SDK
+can fall back to the older route, but that does not fix unreachable media ports.
+Use the pinned server and media configuration together. A favicon 404 is unrelated
+to voice connectivity; the harness now responds to `/favicon.ico` with HTTP 204.
+Restart the browser harness after Python changes, then hard-refresh the page.
+
+If `python -m india_voice.browser` reports `No module named 'india_voice'`, install
+the package using step 1 in the **same virtual environment** used to start it.
 
 ### 4. Start the voice worker
 

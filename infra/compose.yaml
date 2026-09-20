@@ -31,18 +31,22 @@ services:
       timeout: 3s
       retries: 30
   livekit:
-    image: livekit/livekit-server:v1.8.0
+    # JS client 2.17 uses /rtc/v1; 1.8.0 predates that signaling route.
+    image: livekit/livekit-server:v1.13.7
     command:
       - "--dev"
       - "--bind"
       - "0.0.0.0"
-      - "--node-ip=192.168.1.6"
+      # Browser and Python worker run on this computer. Do not advertise an
+      # old Wi-Fi address or the container's unreachable bridge address.
+      - "--node-ip=127.0.0.1"
       - "--udp-port=7882"
       - "--keys"
       - "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-devsecret-which-must-be-at-least-32-chars}"
     ports:
       - "127.0.0.1:${LIVEKIT_PORT:-7880}:7880"
-      - "7882:7882/udp"
+      - "127.0.0.1:7881:7881/tcp"
+      - "127.0.0.1:7882:7882/udp"
 volumes:
   postgres_data:
   redis_data:

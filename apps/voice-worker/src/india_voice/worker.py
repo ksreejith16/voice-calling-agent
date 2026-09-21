@@ -10,12 +10,21 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import json
+import hmac
+import hashlib
+import time
+import contextlib
+from datetime import datetime, timezone
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
 import uuid
 from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
-from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, cli
+from livekit.agents import Agent, AgentSession, APIConnectOptions, JobContext, WorkerOptions, cli
+from livekit.agents.voice.agent_session import SessionConnectOptions
 from livekit.plugins import openai as oai_plugin
 from livekit.plugins import sarvam, silero
 
@@ -25,10 +34,20 @@ from india_voice.telemetry import Recorder
 LOGGER = logging.getLogger("india_voice.worker")
 
 
+class AgentSnapshot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=2000)
+    language: Literal["te-IN", "hi-IN", "en-IN", "te-en"] = "en-IN"
+    voice: Literal["shubh", "aditya", "ritu", "priya", "neha", "rahul", "pooja", "simran"] = "shubh"
+    instructions: str = Field(default="", max_length=12000)
+    openingMessage: str = Field(default="", max_length=1000)
+
+
 class IndiaVoiceAgent(Agent):
     """Conversational agent using the configured OpenAI-compatible LLM."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, extra_instructions: str = "") -> None:
         model_options = {}
         if (urlsplit(settings.llm_base_url).hostname == "api.groq.com"
                 and settings.llm_model in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}):
@@ -36,7 +55,7 @@ class IndiaVoiceAgent(Agent):
             # reasoning out of speech and leave token room for the final answer.
             model_options = {"reasoning_effort": "low", "extra_body": {"include_reasoning": False}}
         super().__init__(
-            instructions=settings.instructions(),
+            instructions=settings.instructions() + "\nAgent conversation instructions:\n" + extra_instructions,
             llm=oai_plugin.LLM(
                 model=settings.llm_model,
                 api_key=settings.llm_api_key.get_secret_value(),
@@ -62,17 +81,83 @@ async def entrypoint(ctx: JobContext) -> None:
     """
     settings = Settings.from_env()
 
+    snapshot = None
+    session_id = ""
+    organization_id = ""
+    terminal_status = "ended"
+    ttl = settings.voice_session_seconds
+    if ctx.job.metadata:
+        metadata = json.loads(ctx.job.metadata)
+        if metadata.get("dashboard") is True:
+            snapshot = AgentSnapshot.model_validate(metadata["agent"])
+            session_id = str(uuid.UUID(metadata["session_id"]))
+            organization_id = str(uuid.UUID(metadata["organization_id"]))
+            expires = datetime.fromisoformat(metadata["expires_at"].replace("Z", "+00:00"))
+            ttl = min(ttl, (expires - datetime.now(timezone.utc)).total_seconds())
+            if ttl <= 0:
+                ctx.shutdown(reason="expired dispatch")
+                return
+            settings = settings.model_copy(update={
+                "voice_language": snapshot.language,
+                "sarvam_tts_language": "te-IN" if snapshot.language == "te-en" else snapshot.language,
+                "sarvam_tts_speaker": snapshot.voice,
+                "voice_instructions_file": "",
+            })
+
+    async def report(status, error_code=None):
+        if not session_id:
+            return
+        body = json.dumps({"id": session_id, "organizationId": organization_id, "status": status, "errorCode": error_code}, separators=(",", ":"))
+        for attempt in range(3):
+            timestamp = str(int(time.time()))
+            signature = hmac.new(settings.livekit_api_secret.get_secret_value().encode(), (timestamp + "\n" + body).encode(), hashlib.sha256).hexdigest()
+            try:
+                async with httpx.AsyncClient(timeout=4) as client:
+                    response = await client.post(settings.voice_api_url + "/internal/voice-tests/event", content=body, headers={"Content-Type": "application/json", "x-voice-timestamp": timestamp, "x-voice-signature": signature})
+                    response.raise_for_status()
+                return
+            except Exception:
+                if attempt < 2:
+                    await asyncio.sleep(0.5)
+        LOGGER.warning("Session outcome callback unavailable; history may need reconciliation")
+
     metrics_dir = Path(settings.voice_metrics_directory)
-    recorder = Recorder(metrics_dir / f"session-{uuid.uuid4().hex}.jsonl")
+    recorder = Recorder(metrics_dir / f"session-{session_id or uuid.uuid4().hex}.jsonl")
+
+    background: set[asyncio.Task] = set()
+    session = None
+
+    def spawn(coro, name):
+        task = asyncio.create_task(coro, name=name)
+        background.add(task)
+        def finished(t):
+            background.discard(t)
+            if not t.cancelled():
+                # Retrieve exceptions; never log provider payloads or credentials.
+                if t.exception() is not None:
+                    LOGGER.warning("Background session operation failed: %s", name)
+        task.add_done_callback(finished)
+        return task
 
     async def _on_shutdown() -> None:
+        for task in list(background):
+            task.cancel()
+        await asyncio.gather(*list(background), return_exceptions=True)
+        if session is not None:
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(session.aclose(), timeout=10)
         recorder.close()
 
     ctx.add_shutdown_callback(_on_shutdown)
 
     await ctx.connect()
+    if session_id:
+        await ctx.room.local_participant.set_attributes({"iv.session": session_id, "iv.ready": "false"})
 
+    connection_options = APIConnectOptions(timeout=settings.voice_provider_timeout_seconds, max_retry=2, retry_interval=0.5)
     session = AgentSession(
+        conn_options=SessionConnectOptions(stt_conn_options=connection_options, llm_conn_options=connection_options, tts_conn_options=connection_options),
+        transcription_timeout=settings.voice_provider_timeout_seconds,
         # Silero VAD: pass the configured silence threshold explicitly.
         # The SDK default is 550 ms; this application is configured for 180 ms.
         vad=silero.VAD.load(
@@ -131,16 +216,56 @@ async def entrypoint(ctx: JobContext) -> None:
     def _on_item(event) -> None:
         recorder.on_conversation_item(event.item)
 
+    @session.on("error")
+    def _on_error(event) -> None:
+        nonlocal terminal_status
+        if not event.error.recoverable:
+            terminal_status = "failed"
+            spawn(report("failed", "provider_error"), "report-provider-error")
+            spawn(ctx.room.local_participant.set_attributes({"iv.error": "provider_error"}), "publish-provider-error")
+
+    @session.on("close")
+    def _on_close(event) -> None:
+        if terminal_status == "expired":
+            return  # TTL task owns reporting and room teardown.
+        # Give the browser a moment to receive the terminal error attribute.
+        async def finish():
+            await report(terminal_status, "provider_error" if terminal_status == "failed" else None)
+            await asyncio.sleep(1)
+            ctx.shutdown(reason="voice session closed")
+        spawn(finish(), "session-closed")
+
     async def _enforce_session_ttl() -> None:
-        await asyncio.sleep(settings.voice_session_seconds)
-        LOGGER.info("Session TTL reached (%ds); closing.", settings.voice_session_seconds)
+        nonlocal terminal_status
+        await asyncio.sleep(ttl)
+        terminal_status = "expired"
+        LOGGER.info("Session TTL reached; closing.")
+        await report("expired")
         await session.aclose()
+        # Room deletion is independent of browser connection/token expiry.
+        from livekit import api
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(ctx.api.room.delete_room(api.DeleteRoomRequest(room=ctx.room.name)), timeout=8)
+        ctx.shutdown(reason="session expired")
 
-    # Task outlives entrypoint() — asyncio tasks are not cancelled when the
-    # creating coroutine returns. aclose() on an already-closed session is a no-op.
-    asyncio.create_task(_enforce_session_ttl(), name="session-ttl")
+    spawn(_enforce_session_ttl(), "session-ttl")
+    try:
+        # Do not synthesize an opening message before its intended listener joins.
+        await asyncio.wait_for(ctx.wait_for_participant(), timeout=min(45, ttl))
+        await session.start(agent=IndiaVoiceAgent(settings, snapshot.instructions if snapshot else ""), room=ctx.room)
+        if session_id:
+            await ctx.room.local_participant.set_attributes({"iv.ready": "true"})
+            spawn(report("active"), "report-active")
+        if snapshot and snapshot.openingMessage:
+            session.say(snapshot.openingMessage, allow_interruptions=True)
+    except Exception:
+        terminal_status = "failed"
+        LOGGER.warning("Voice session startup failed")
+        await report("failed", "startup_failed")
+        with contextlib.suppress(Exception):
+            await ctx.room.local_participant.set_attributes({"iv.error": "startup_failed"})
+        ctx.shutdown(reason="startup failed")
 
-    await session.start(agent=IndiaVoiceAgent(settings), room=ctx.room)
 
 
 def main() -> None:

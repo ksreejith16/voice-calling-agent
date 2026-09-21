@@ -1,7 +1,8 @@
 import {
-  Body, Controller, Delete, Get, Inject, Param, ParseUUIDPipe,
+  BadRequestException, ForbiddenException, NotFoundException, Body, Controller, Delete, Get, Inject, Param, ParseUUIDPipe,
   Patch, Post, UseGuards,
 } from '@nestjs/common';
+import { z } from 'zod';
 import { eq, and } from 'drizzle-orm';
 import type { Database } from '@india-voice/database';
 import { agentConfigs, supportedLanguage } from '@india-voice/database';
@@ -10,13 +11,17 @@ import { ClerkAuthGuard } from '../auth/clerk.guard';
 import { CurrentUser, type AuthenticatedUser } from '../auth/current-user.decorator';
 import { DATABASE } from '../database.token';
 
-interface CreateAgentBody {
-  name: string;
-  description?: string;
-  language?: string;
-  voice?: string;
-  instructions?: string;
-  openingMessage?: string;
+export const agentInput = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional(),
+  language: z.enum(['te-IN', 'hi-IN', 'en-IN', 'te-en']).optional(),
+  voice: z.enum(['shubh', 'aditya', 'ritu', 'priya', 'neha', 'rahul', 'pooja', 'simran']).optional(),
+  instructions: z.string().trim().max(12000).optional(),
+  openingMessage: z.string().trim().max(1000).optional(),
+}).strict();
+type CreateAgentBody = z.infer<typeof agentInput>;
+function writable(user: AuthenticatedUser) {
+  if (user.role === 'viewer') throw new ForbiddenException('Viewers cannot change agents');
 }
 
 @Controller('agents')
@@ -43,11 +48,16 @@ export class AgentsController {
         .where(and(eq(agentConfigs.organizationId, user.organizationId), eq(agentConfigs.id, id)))
         .limit(1),
     );
-    return row ?? null;
+    if (!row) throw new NotFoundException('Agent not found');
+    return row;
   }
 
   @Post()
-  async create(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateAgentBody) {
+  async create(@CurrentUser() user: AuthenticatedUser, @Body() input: unknown) {
+    writable(user);
+    const parsed = agentInput.safeParse(input);
+    if (!parsed.success) throw new BadRequestException('Invalid agent configuration');
+    const body = parsed.data;
     const [row] = await withTenantTransaction(this.db, user.organizationId, (tx) =>
       tx.insert(agentConfigs).values({
         organizationId: user.organizationId,
@@ -66,8 +76,12 @@ export class AgentsController {
   async update(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: Partial<CreateAgentBody>,
+    @Body() input: unknown,
   ) {
+    writable(user);
+    const parsed = agentInput.partial().safeParse(input);
+    if (!parsed.success) throw new BadRequestException('Invalid agent configuration');
+    const body = parsed.data;
     const [row] = await withTenantTransaction(this.db, user.organizationId, (tx) =>
       tx.update(agentConfigs)
         .set({
@@ -82,7 +96,8 @@ export class AgentsController {
         .where(and(eq(agentConfigs.organizationId, user.organizationId), eq(agentConfigs.id, id)))
         .returning(),
     );
-    return row ?? null;
+    if (!row) throw new NotFoundException('Agent not found');
+    return row;
   }
 
   @Delete(':id')
@@ -90,6 +105,7 @@ export class AgentsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
+    writable(user);
     await withTenantTransaction(this.db, user.organizationId, (tx) =>
       tx.update(agentConfigs)
         .set({ status: 'archived', updatedAt: new Date() })

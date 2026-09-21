@@ -12,7 +12,7 @@ export interface DependencyChecks extends OnApplicationShutdown {
 
 const tenantTables = [
   'organizations', 'users', 'wallets', 'wallet_transactions',
-  'wallet_reservations', 'campaigns', 'leads', 'call_logs',
+  'wallet_reservations', 'campaigns', 'leads', 'call_logs', 'agent_configs', 'voice_test_sessions',
 ];
 
 export class Infrastructure implements DependencyChecks {

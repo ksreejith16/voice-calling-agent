@@ -1,3 +1,8 @@
+> **Dashboard voice tests:** Saved agents now have an Edit / Test voice page.
+> See [setup and manual acceptance checklist](docs/dashboard-voice-tests.md).
+> Run `npm.cmd run dev:platform` to start the local stack and worker together.
+> This is development browser testing; wallet charging and PSTN are not connected.
+
 # India Voice Platform
 
 Multi-tenant AI voice calling SaaS for Indian businesses. Phase 1 is complete:

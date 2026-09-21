@@ -19,8 +19,22 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1758470400000,
+      "when": 1789461380781,
       "tag": "0002_agent_configs",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789461380782,
+      "tag": "0003_auth_provision_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789461380783,
+      "tag": "0004_voice_test_sessions",
       "breakpoints": true
     }
   ]

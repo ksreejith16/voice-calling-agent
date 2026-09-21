@@ -8,6 +8,7 @@ import { APP_CONFIG } from './config.token';
 import type { AppConfig } from './config';
 import { ClerkAuthGuard } from './auth/clerk.guard';
 import { ProvisionController } from './auth/provision.controller';
+import { VoiceController, VoiceEventsController } from './voice/voice.controller';
 import { AgentsController } from './agents/agents.controller';
 import { CampaignsController } from './campaigns/campaigns.controller';
 import { LeadsController } from './leads/leads.controller';
@@ -52,6 +53,8 @@ export class AppModule {
         HealthController,
         ProvisionController,
         AgentsController,
+        VoiceController,
+        VoiceEventsController,
         CampaignsController,
         LeadsController,
         CallLogsController,

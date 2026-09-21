@@ -31,7 +31,22 @@ const environmentSchema = z.object({
   AUTH_MODE: z.enum(['disabled', 'clerk']).default('disabled'),
   CLERK_SECRET_KEY: z.string().min(1).optional(),
   CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
+  LIVEKIT_URL: z.string().default(''),
+  LIVEKIT_API_KEY: z.string().default(''),
+  LIVEKIT_API_SECRET: z.string().default(''),
+  VOICE_AGENT_NAME: z.string().default('india-voice-prototype'),
+  VOICE_TEST_ENABLED: z.enum(['true', 'false']).default('false'),
 }).superRefine((value, context) => {
+  if (value.VOICE_TEST_ENABLED === 'true') {
+    if (value.NODE_ENV === 'production') context.addIssue({ code: 'custom', path: ['VOICE_TEST_ENABLED'], message: 'Unbilled browser testing is development-only' });
+    for (const key of ['LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET'] as const) {
+      if (!value[key].trim()) context.addIssue({ code: 'custom', path: [key], message: 'Required for browser voice tests' });
+    }
+    const url = URL.canParse(value.LIVEKIT_URL) ? new URL(value.LIVEKIT_URL) : null;
+    if (!url || !['ws:', 'wss:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || (url.protocol === 'ws:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) {
+      context.addIssue({ code: 'custom', path: ['LIVEKIT_URL'], message: 'Use a secure LiveKit URL or a loopback development URL' });
+    }
+  }
   if (value.AUTH_MODE === 'clerk' && !value.CLERK_SECRET_KEY) {
     context.addIssue({
       code: 'custom',

@@ -27,6 +27,7 @@ class Settings(BaseModel):
     llm_api_key: SecretStr
     llm_model: str = Field(min_length=1, max_length=200)
     llm_max_completion_tokens: int = Field(default=2048, ge=128, le=8192)
+    voice_api_url: str = "http://127.0.0.1:3001"
     voice_agent_name: str = Field(default="india-voice-prototype", pattern=r"^[a-z][a-z0-9-]{0,63}$")
     voice_language: Literal["te-IN", "hi-IN", "en-IN", "te-en"] = "en-IN"
     sarvam_stt_language: Literal["auto", "te-IN", "hi-IN", "en-IN"] = "auto"
@@ -56,7 +57,7 @@ class Settings(BaseModel):
             raise ValueError("must be configured locally")
         return value
 
-    @field_validator("livekit_url", "llm_base_url")
+    @field_validator("livekit_url", "llm_base_url", "voice_api_url")
     @classmethod
     def endpoint(cls, value: str, info) -> str:
         parsed = urlsplit(value)

@@ -2,7 +2,7 @@
   "name": "india-voice-platform",
   "version": "0.1.0",
   "private": true,
-  "description": "Multi-tenant India voice platform — Phase 1 foundation",
+  "description": "Multi-tenant India voice platform \u00e2\u20ac\u201d Phase 1 foundation",
   "engines": {
     "node": ">=22.12.0 <23 || >=24.0.0",
     "npm": ">=10"
@@ -26,7 +26,9 @@
     "test:database": "node --env-file-if-exists=.env --test tests/database.integration.test.cjs",
     "test:smoke": "node --env-file-if-exists=.env --test tests/smoke.test.cjs",
     "test:voice": "apps/voice-worker/.venv/Scripts/python.exe -m pytest -c apps/voice-worker/pyproject.toml apps/voice-worker/tests -q && node --test apps/voice-worker/browser/app.test.cjs",
-    "verify": "npm run typecheck && npm run build && npm test && npm run test:database && npm run test:smoke && npm run test:voice"
+    "verify": "npm run typecheck && npm run build && npm test && npm run test:database && npm run test:smoke && npm run test:voice",
+    "dev:voice": "node scripts/run-voice.cjs",
+    "dev:platform": "npm run infra:up && npm run db:migrate && npm run build -w @india-voice/database && concurrently -k -n api,web,voice \"npm run dev -w @india-voice/api\" \"npm run dev -w @india-voice/web\" \"npm run dev:voice\""
   },
   "devDependencies": {
     "@types/node": "22.20.2",

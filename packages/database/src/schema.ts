@@ -309,6 +309,26 @@ export const agentConfigs = pgTable('agent_configs', {
   check('agent_configs_status_valid', sql`${table.status} IN ('active', 'archived')`),
 ]);
 
+// Browser tests are deliberately separate from billable telephone call records.
+export const voiceTestSessions = pgTable('voice_test_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: tenantId(),
+  agentId: uuid('agent_id').notNull(),
+  userId: uuid('user_id').notNull(),
+  room: varchar('room', { length: 100 }).notNull().unique(),
+  snapshot: jsonb('snapshot').$type<Record<string, unknown>>().notNull(),
+  status: varchar('status', { length: 30 }).notNull().default('starting'),
+  errorCode: varchar('error_code', { length: 80 }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  ...auditColumns(),
+}, (t) => [
+  foreignKey({ name: 'voice_test_agent_tenant_fk', columns: [t.organizationId, t.agentId], foreignColumns: [agentConfigs.organizationId, agentConfigs.id] }),
+  foreignKey({ name: 'voice_test_user_tenant_fk', columns: [t.organizationId, t.userId], foreignColumns: [users.organizationId, users.id] }),
+  index('voice_test_history_idx').on(t.organizationId, t.createdAt),
+  check('voice_test_status_valid', sql`${t.status} IN ('starting', 'active', 'ended', 'failed', 'expired')`),
+]);
+
 export const organizationsRelations = relations(organizations, ({ many, one }) => ({
   users: many(users), wallet: one(wallets), campaigns: many(campaigns), leads: many(leads), calls: many(callLogs),
 }));

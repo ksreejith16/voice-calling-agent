@@ -50,7 +50,7 @@ export default async function AgentsPage() {
                   <td>{LANG_LABELS[a.language] ?? a.language}</td>
                   <td>{a.voice ?? <span className="muted">default</span>}</td>
                   <td>{new Date(a.createdAt).toLocaleDateString("en-IN")}</td>
-                  <td><Link href={`/dashboard/agents/${a.id}`} className="dash-link">Edit</Link></td>
+                  <td><Link href={`/dashboard/agents/${a.id}`} className="dash-link">Edit / Test voice</Link></td>
                 </tr>
               ))}
             </tbody>
@@ -59,11 +59,9 @@ export default async function AgentsPage() {
       )}
 
       <div className="dash-notice">
-        Tip: After creating an agent, you can test it live at{" "}
-        <a href="http://127.0.0.1:8765" target="_blank" rel="noopener">
-          http://127.0.0.1:8765
-        </a>{" "}
-        with the voice browser harness.
+        Open an agent using Edit / Test voice to save changes and start a browser
+        conversation with that agent. The separate prototype remains available
+        at <a href="http://127.0.0.1:8765" target="_blank" rel="noopener">127.0.0.1:8765</a>.
       </div>
     </div>
   );

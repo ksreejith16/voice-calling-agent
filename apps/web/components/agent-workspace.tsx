@@ -6,7 +6,13 @@ import { Room, RoomEvent, Track } from 'livekit-client';
 type Agent = { id: string; name: string; description: string; language: string; voice: string | null; instructions: string; openingMessage: string; status: string };
 type History = { id: string; status: string; errorCode: string | null; createdAt: string; expiresAt: string };
 async function request(path: string, method = 'GET', body?: unknown) {
-  const response = await fetch('/api/workspace/' + path, { method, headers: { 'Content-Type': 'application/json' }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(30000) });
+  const serializedBody = body === undefined ? undefined : JSON.stringify(body);
+  const response = await fetch('/api/workspace/' + path, {
+    method,
+    headers: serializedBody ? { 'Content-Type': 'application/json' } : {},
+    ...(serializedBody ? { body: serializedBody } : {}),
+    signal: AbortSignal.timeout(30000),
+  });
   const data = await response.json();
   if (!response.ok) throw new Error(typeof data.message === 'string' ? data.message : 'Request failed');
   return data;

@@ -577,3 +577,569 @@ For each milestone, report:
 - Known limitations.
 - The next concrete milestone.
 The objective is a usable, secure business product built around the working voice prototype—not merely a prettier demo.
+
+
+
+
+
+
+
+
+
+
+
+
+next steps :
+You are the senior engineer responsible for completing and production-hardening an India-first, multi-tenant B2B AI voice-calling platform.
+
+Work directly in this existing repository. Inspect the actual source code, database migrations, documentation, package manifests, Git state, and runtime architecture before changing anything. Do not trust summaries without verifying them against the code.
+
+First read these completely:
+
+1. INDIA_VOICE_PLATFORM_HANDOFF.md
+   Expected original location:
+   C:\Users\sreej\Downloads\INDIA_VOICE_PLATFORM_HANDOFF.md
+
+2. README.md
+
+3. docs/architecture.md
+
+4. docs/verification.md
+
+5. docs/dashboard-voice-tests.md
+
+6. docs/clerk-local-setup.md
+
+7. apps/voice-worker/README.md
+
+8. All current source files and database migrations relevant to authentication, agents, voice tests, calls, campaigns, leads, wallets, billing, and tenant security.
+
+The handoff document contains approved requirements and decisions. Treat its requirements as authoritative unless they conflict with a newer explicit decision already implemented and documented in the repository. Explain any conflict before changing architecture.
+
+Do not merely write a plan. Implement the work, add meaningful tests, run appropriate checks, fix failures, and continue until every item that can be completed locally is finished. Stop only for a genuine external dependency such as missing provider account capability, production credentials, DNS, legal approval, or deployment approval.
+
+Never expose, print, replace, or commit secrets from `.env`. Preserve the existing local environment and database data. Do not reset or drop the development database. Never use schema push in place of reviewed, versioned migrations.
+
+# Current project
+
+The platform lets Indian businesses:
+
+- Register and sign in.
+- Create an organization/workspace.
+- Create reusable AI voice agents.
+- Configure language, voice, instructions, and opening message.
+- Upload and manage leads.
+- Create campaigns.
+- Fund a prepaid wallet.
+- Place AI voice calls.
+- View call status, duration, transcript, outcomes, costs, and campaign results.
+- Be charged safely using an auditable prepaid accounting workflow.
+
+The primary supported languages are:
+
+- Telugu
+- Hindi
+- Indian English
+- Natural Telugu-English and other supported code-switching
+
+# Current technology
+
+Keep the existing technology choices unless there is strong evidence that a change is required:
+
+- TypeScript monorepo with npm workspaces
+- Next.js 16 and React 19 website
+- NestJS and Fastify API
+- Clerk authentication
+- PostgreSQL with Drizzle migrations
+- Forced PostgreSQL row-level security
+- Redis
+- Python LiveKit Agents worker
+- Local LiveKit server
+- Sarvam Saaras Realtime streaming STT
+- Configurable OpenAI-compatible streaming LLM
+- Sarvam Bulbul v3 streaming TTS
+- Silero VAD
+- Integer-paise prepaid accounting
+- Planned Razorpay payments
+- Planned Exotel PSTN integration
+
+Use current official provider documentation and installed SDK source when implementing provider integrations. For technical claims, use primary sources. Pin compatible dependency versions.
+
+# What is already implemented
+
+Verify all of this against the source:
+
+- Runnable TypeScript monorepo.
+- PostgreSQL and Redis infrastructure.
+- Restricted `voice_app` database role and separate migration owner.
+- Forced row-level security.
+- Eight original foundation tables and later `agent_configs`.
+- Clerk sign-in/sign-up and onboarding.
+- Organization and wallet provisioning.
+- Authenticated tenant resolution.
+- Dashboard pages for overview, agents, campaigns, leads, calls, wallet, integrations, and settings.
+- Agent creation and basic campaign creation.
+- Standalone Python voice prototype.
+- Sarvam STT → streaming LLM → Sarvam TTS pipeline.
+- Silero VAD and interruption configuration.
+- Local LiveKit browser test.
+- Agent-specific dashboard voice testing.
+- Agent edit/archive controls.
+- Authenticated LiveKit room creation and worker dispatch.
+- Tenant-checked agent configuration snapshots.
+- Dashboard microphone, mute, audio, status, transcript, and end-session controls.
+- Voice-test session history.
+- Worker lifecycle callbacks signed with HMAC.
+- Worker timeout and room-cleanup logic.
+- `voice_test_sessions` database migration.
+- Local `dev:platform` startup command.
+- The empty JSON-body error in voice-test start/end requests was fixed.
+- The saved-agent dashboard voice test has been manually confirmed working.
+
+Do not assume these implementations are production-safe. Audit them thoroughly.
+
+# Main objective
+
+Turn the working prototype into a production-quality business platform that a customer can sign up for, fund, configure, and use to make compliant AI calls with reliable billing and complete operational visibility.
+
+The final workflow should be:
+
+1. Customer signs up with Clerk.
+2. Customer creates or joins an organization.
+3. Customer configures an AI agent.
+4. Customer verifies the agent in a browser voice test.
+5. Customer completes required business, telephony, consent, and billing setup.
+6. Customer adds funds through Razorpay.
+7. Verified webhook processing credits the prepaid wallet exactly once.
+8. Customer imports consented leads.
+9. Customer creates and validates a campaign.
+10. Platform verifies consent, allowed calling window, wallet balance, provider readiness, concurrency, and campaign state.
+11. Platform atomically reserves the maximum permitted call cost.
+12. A durable job dispatches an outbound Exotel call.
+13. Exotel connects the telephone audio to the LiveKit voice worker through a provider-supported integration.
+14. The worker receives an immutable agent and campaign snapshot.
+15. The AI conducts the conversation with interruption support.
+16. Provider callbacks update the call lifecycle idempotently.
+17. The platform obtains verified connected-call duration.
+18. The platform settles the charge atomically and releases unused reservation funds.
+19. The call transcript, outcome, qualification, timing, provider identifiers, and accounting records become visible in the dashboard.
+20. Failed, duplicated, interrupted, or uncertain calls are reconciled safely.
+
+# Non-negotiable architecture and security rules
+
+## Tenant isolation
+
+- Every tenant-owned table must have forced row-level security.
+- Every business query must execute inside a transaction-local tenant context.
+- Tenant identity must come only from verified authentication and membership.
+- Never accept an organization ID from the browser as authorization.
+- Verify object ownership at every boundary.
+- Add tests proving that one organization cannot read, change, start, end, or bill another organization’s resources.
+- Keep the runtime database role restricted and unable to assume the migration role.
+- Security-definer functions must have an explicit safe search path, minimal privileges, validated inputs, and narrowly scoped execute grants.
+
+## Authentication and authorization
+
+- Audit Clerk JWT verification using the current official Clerk SDK.
+- Validate authorized parties/audience/issuer as appropriate.
+- Replace deprecated Clerk route-matcher authentication with the supported Next.js 16/Clerk approach.
+- Implement clear roles: owner, admin, member, viewer.
+- Define and enforce a permissions matrix for every API operation.
+- Protect onboarding from duplicate-organization races.
+- Add secure member invitation and role-management flows if required by the approved handoff.
+- Handle expired sessions and deactivated members consistently.
+
+## Input validation
+
+- Use shared schemas for API payloads.
+- Reject unknown fields where appropriate.
+- Bound all names, instructions, messages, files, metadata, transcripts, and provider payloads.
+- Normalize phone numbers to E.164.
+- Never trust provider callbacks without signature verification.
+- Prevent mass-assignment of tenant, role, balance, status, pricing, and provider fields.
+
+## Money
+
+- Represent money as integer paise or PostgreSQL bigint.
+- Never use floating-point arithmetic for balances or charges.
+- Never credit a wallet from a browser redirect or unverified client response.
+- Only verified, idempotent Razorpay events may credit funds.
+- Never start a billable call without an atomic reservation.
+- Prevent concurrent calls from reserving the same available funds.
+- Use immutable ledger entries and compensating entries rather than history mutation.
+- Snapshot the rate and all pricing inputs before the call.
+- Define rounding explicitly and consistently.
+- Every payment, reservation, settlement, release, refund, and correction needs a stable idempotency key and audit metadata.
+- Duplicate provider events must be harmless.
+
+## Voice sessions
+
+- Keep the complete streaming pipeline.
+- Ensure correct audio sample rates, channel counts, frame sizes, resampling, bounded queues, and backpressure.
+- Cancel obsolete LLM/TTS work when the caller interrupts.
+- Clear queued playback and prevent stale audio from resuming.
+- Clean up rooms and provider streams on disconnect, timeout, shutdown, navigation, and cancellation races.
+- Provide useful errors for unavailable workers, STT, LLM, TTS, LiveKit, and telephony.
+- Do not log raw audio, credentials, JWTs, or sensitive transcript content by default.
+- Verify whether the current worker produces event-loop blocking warnings and move blocking work away from the real-time loop.
+- Preserve the standalone prototype as a diagnostic tool, but make the dashboard workflow the supported product experience.
+
+## PSTN and Exotel
+
+Do not invent a generic Exotel/LiveKit integration.
+
+Before implementation:
+
+- Read current official Exotel voice, streaming, SIP, webhook, status callback, recording, and call-detail documentation.
+- Confirm which capability the configured Exotel account supports.
+- Determine the officially supported audio transport: SIP, media streaming, WebSocket, or another documented mechanism.
+- Confirm codecs, sample rates, call initiation API, callback format, callback authentication, call IDs, duration fields, rate limits, regional requirements, and disconnect controls.
+- Document which integration path is implemented and why.
+- If account enablement is required, complete the adapter, validation, mocks, and documentation, then report the exact account-side capability that must be enabled.
+- Never claim PSTN calling works until a real controlled phone call has been completed.
+
+# Required implementation milestones
+
+## Milestone 1: Audit and stabilize the current repository
+
+- Review all existing changes and uncommitted files.
+- Fix malformed text and encoding artifacts in the UI.
+- Remove misleading claims and placeholder statuses.
+- Resolve deprecations that affect security or reliability.
+- Audit migrations 0000 through the latest migration.
+- Confirm migration timestamps are monotonic.
+- Confirm migrations replay safely on a new database.
+- Add missing indexes, foreign keys, checks, RLS policies, triggers, and relations.
+- Review voice-test session recovery and cleanup behavior.
+- Ensure API/web/worker shutdown is clean.
+- Improve error responses without exposing credentials or provider payloads.
+- Update README and environment templates accurately.
+
+## Milestone 2: Complete the product UI
+
+Create a polished, responsive, accessible business dashboard.
+
+Required pages:
+
+- Public landing page
+- Pricing/explanation page if pricing is approved
+- Sign-in and sign-up
+- Onboarding
+- Dashboard overview
+- Agents list
+- Agent create/edit/test/history
+- Campaign list/create/detail
+- Leads list/import/detail
+- Calls list/detail
+- Wallet, top-up, transactions, reservations
+- Integrations
+- Team and roles
+- Organization settings
+- Compliance/consent settings
+- Usage and operational status
+
+Design requirements:
+
+- Strong, modern visual hierarchy.
+- Excellent desktop and mobile responsiveness.
+- Accessible keyboard navigation, focus states, labels, contrast, and reduced-motion support.
+- Skeletons, empty states, errors, retry states, confirmations, and success feedback.
+- Avoid hydration differences and browser-only values during server rendering.
+- Use subtle motion and depth.
+- Use tasteful 3D or layered visual elements only where they improve the landing page or product comprehension.
+- Do not add heavy WebGL, large assets, or distracting effects to operational dashboard pages.
+- Respect `prefers-reduced-motion`.
+- Optimize Core Web Vitals and bundle size.
+- Keep operational pages clean and fast.
+
+Do not show mocked values as real business data.
+
+## Milestone 3: Finish agents and browser voice testing
+
+- Complete agent details and versioning or immutable configuration snapshots.
+- Validate supported Sarvam voices and languages using current official documentation.
+- Allow safe model settings only through approved server-side configuration.
+- Show worker/provider readiness.
+- Show live connection, listening, thinking, speaking, interrupted, reconnecting, failed, and ended states.
+- Make transcript updates stable without duplicates.
+- Add session timing diagnostics.
+- Add download/export of safe diagnostic events without credentials.
+- Test two agents with different instructions.
+- Test Telugu, Hindi, Indian English, and code-switching.
+- Test rapid start/end, navigation, reconnect, microphone failure, worker failure, provider failure, and cancellation races.
+- Never debit the prepaid wallet for browser tests.
+- Clearly display that provider usage may still incur provider costs.
+
+## Milestone 4: Leads and consent
+
+- Implement CSV import with preview.
+- Validate headers, row counts, file size, encoding, names, and E.164 phone numbers.
+- Report row-level errors without partially importing invalid batches unless an explicitly documented partial-import mode exists.
+- Detect duplicates within the file and organization.
+- Store consent source, timestamp, purpose, channel, evidence reference, and revocation status.
+- Implement do-not-call and suppression rules.
+- Add lead status transitions and audit history.
+- Verify current applicable Indian telemarketing, privacy, consent, and calling-window requirements from authoritative sources.
+- Make compliance policy configurable and auditable.
+- Do not make legal-compliance claims without documented review.
+
+## Milestone 5: Campaign orchestration
+
+- Implement campaign validation and lifecycle transitions.
+- Associate an agent and immutable configuration snapshot.
+- Configure language, schedule, calling window, retry rules, rate, concurrency, and maximum call duration.
+- Add pause, resume, cancel, and completion behavior.
+- Use a durable Redis-backed job queue.
+- Use an outbox pattern so database state and job dispatch cannot diverge.
+- Add idempotent job identifiers.
+- Prevent duplicate calls for the same campaign/lead/attempt.
+- Recover safely after API, queue, worker, or provider restarts.
+- Use distributed concurrency controls.
+- Add backoff with jitter for retryable failures.
+- Never retry consent, DNC, invalid-number, or other permanent failures.
+
+## Milestone 6: Razorpay prepaid wallet
+
+Verify current official Razorpay APIs and webhook documentation.
+
+Implement:
+
+- Server-created payment orders.
+- Checkout integration.
+- Verified webhook signatures.
+- Durable raw-event metadata without unnecessary sensitive payload retention.
+- Idempotent event processing.
+- Payment state machine.
+- Atomic wallet credit.
+- Wallet transaction history.
+- Pending, successful, failed, expired, refunded, disputed, and reconciled states as supported.
+- Manual reconciliation tooling for administrators.
+- Safe handling of webhook-before-redirect and redirect-before-webhook ordering.
+- No wallet credit until verification succeeds.
+
+## Milestone 7: Reservation and settlement engine
+
+Implement transactional services for:
+
+- Reserve.
+- Extend if explicitly supported and safe.
+- Mark awaiting settlement.
+- Settle.
+- Release.
+- Expire.
+- Reconcile.
+- Compensate.
+
+The reservation calculation must use:
+
+- Available wallet balance.
+- Snapshotted per-minute rate.
+- Maximum permitted call duration.
+- Explicit rounding rules.
+- Any applicable taxes or fees only if the approved product model includes them.
+
+Guarantees:
+
+- No double reservation.
+- No negative available balance.
+- No settlement above the authorized reservation unless an explicitly approved exposure policy exists.
+- Duplicate settlement events are harmless.
+- Uncertain duration produces an awaiting-settlement state, not an invented charge.
+- Provider duration is verified and reconciled.
+- Ledger, wallet, call, and reservation updates are atomic.
+- Add concurrency and failure-injection tests.
+
+## Milestone 8: Exotel outbound calling
+
+Implement the verified provider integration:
+
+- Secure credential configuration.
+- Provider readiness check.
+- Outbound call initiation.
+- Idempotency mapping.
+- Signed/authenticated callbacks.
+- Call state machine: queued, dialing, ringing, connected, completed, failed, cancelled, no-answer, busy.
+- Provider call ID storage.
+- Audio connection to the selected LiveKit worker through the verified supported method.
+- Maximum-duration enforcement outside the LLM/voice worker when possible.
+- Hang-up/cancel control.
+- Provider callback deduplication.
+- Call-detail and duration reconciliation.
+- Clear failure classification.
+- Masked phone numbers in standard logs.
+- One controlled manual real-phone test checklist.
+
+Before dispatching a call:
+
+- Confirm tenant and campaign.
+- Confirm lead consent and calling eligibility.
+- Confirm agent and provider readiness.
+- Atomically create the call record and wallet reservation.
+- Persist an outbox event.
+- Dispatch asynchronously.
+- Release the reservation if dispatch fails before a billable connection.
+
+## Milestone 9: Call records and post-call analysis
+
+Store and display:
+
+- Call lifecycle.
+- Lead and campaign.
+- Agent snapshot.
+- Provider identifiers.
+- Started, connected, and ended timestamps.
+- Verified connected duration.
+- Reservation and settlement.
+- Rate snapshot and final charge.
+- Error classification.
+- Transcript where consent and retention policy allow it.
+- Recording metadata where allowed.
+- Structured summary.
+- Qualification score from 1 to 10.
+- Hot/warm/cold classification.
+- Captured fields.
+- Objections.
+- Follow-up action.
+- Evidence references for important extracted conclusions.
+
+Post-call analysis must:
+
+- Use a versioned structured schema.
+- Never invent missing information.
+- Distinguish facts stated by the caller from model inference.
+- Be retryable and idempotent.
+- Not block settlement.
+- Allow human correction with an audit trail.
+
+## Milestone 10: Reliability and operations
+
+- Structured logs with request/session/call correlation IDs.
+- Metrics for API, queue, provider calls, STT, LLM, TTS, playback, billing, webhooks, and reconciliation.
+- Health, readiness, and dependency status.
+- Alerts for payment failures, settlement backlog, stuck calls, provider errors, and low wallet balance.
+- Dead-letter queue and replay tooling.
+- Reconciliation workers.
+- Database backups and documented restore procedure.
+- Graceful shutdown and queue draining.
+- Data retention and deletion jobs.
+- Rate limiting and abuse protection.
+- Secure headers and content security policy.
+- Secret rotation guidance.
+- Separate development, staging, and production configurations.
+- Never include production credentials in images or client bundles.
+
+## Milestone 11: Testing
+
+Add meaningful tests without simply mirroring implementation.
+
+Required test areas:
+
+- Authentication and permissions.
+- Cross-tenant isolation.
+- Provisioning idempotency.
+- Agent validation.
+- Voice-session ownership.
+- Start/end races.
+- Obsolete event and playback suppression.
+- Provider timeout and failure.
+- Worker reconnect and shutdown.
+- CSV validation.
+- Consent and calling eligibility.
+- Campaign idempotency.
+- Queue recovery.
+- Payment signature verification.
+- Duplicate payment webhooks.
+- Concurrent wallet reservations.
+- Settlement/release races.
+- Duplicate provider callbacks.
+- Duration reconciliation.
+- Migration replay.
+- API contract tests.
+- Critical browser workflows.
+- Controlled mocked PSTN lifecycle.
+
+Clearly separate:
+
+- Unit tests.
+- Integration tests.
+- Mocked provider tests.
+- Local LiveKit tests.
+- Live Sarvam/LLM tests.
+- Live Razorpay sandbox tests.
+- Live Exotel telephone tests.
+
+Never report mocked tests as live provider verification.
+
+## Milestone 12: Performance and launch readiness
+
+- Profile the full voice path.
+- Record endpointing, final STT, first LLM token, first TTS audio, playback start, and end-to-end timing.
+- Keep internal metrics separate from caller-perceived latency.
+- The caller-endpoint p95 target is below 500 ms, but it remains unverified until measured using a real endpoint.
+- Test realistic network conditions and concurrent calls.
+- Establish supported concurrency based on evidence.
+- Optimize database queries and indexes.
+- Paginate large lists.
+- Stream exports.
+- Avoid loading transcripts or large payloads on overview pages.
+- Run dependency, secret, and security checks.
+- Produce a production-readiness report with pass/fail evidence.
+
+# Required status and documentation behavior
+
+Maintain a progress document while working. For each milestone, record:
+
+- Implemented files.
+- Database migrations.
+- Security decisions.
+- Provider documentation used.
+- Commands run.
+- Exact test counts and results.
+- Mocked versus live verification.
+- Remaining blockers.
+- Manual steps required from the owner.
+
+Do not write “production ready,” “fully secure,” “compliant,” “latency target met,” “billing guaranteed,” or “PSTN verified” unless evidence supports that exact claim.
+
+# External dependencies and approval boundaries
+
+Complete all local code, migrations, adapters, mocks, documentation, and automated verification before requesting input.
+
+Do not:
+
+- Purchase provider plans.
+- Change external account settings.
+- Deploy publicly.
+- Configure DNS.
+- Initiate a real paid telephone call.
+- Send WhatsApp messages.
+- Charge a real card.
+- Invite real users.
+
+For those actions, prepare a concrete, reviewable implementation and exact manual checklist first, then stop for owner approval.
+
+If credentials or account features are missing, report only the variable or feature name. Never ask for secret values in chat.
+
+# Final deliverables
+
+When all locally possible work is complete, provide:
+
+1. A concise description of the final system.
+2. A list of files and migrations created or changed.
+3. Exact commands for first-time installation.
+4. Exact commands for normal development startup.
+5. Production environment-variable inventory without secret values.
+6. Database migration and rollback/recovery guidance.
+7. Test commands and actual results.
+8. Separate mocked and live-provider results.
+9. Complete browser voice-test checklist.
+10. Razorpay sandbox checklist.
+11. Exotel controlled-call checklist.
+12. Deployment checklist.
+13. Security and tenant-isolation review.
+14. Billing invariants and reconciliation explanation.
+15. Monitoring and incident-response checklist.
+16. Remaining limitations and external blockers.
+17. A prioritized go-live checklist.
+
+Start by auditing the current repository and writing an evidence-based implementation plan. Then immediately begin Milestone 1 and continue sequentially. Do not stop after planning.

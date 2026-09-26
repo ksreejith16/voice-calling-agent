@@ -9,7 +9,19 @@ async function forward(request: Request, context: { params: Promise<{ path: stri
   if (!['GET','HEAD'].includes(request.method) && request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ message: 'Invalid origin' }, { status: 403 });
   try {
     const token = await getToken();
-    const response = await fetch(`${API}/${route}`, { method: request.method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(['POST','PATCH'].includes(request.method) ? { body: await request.text() } : {}), cache: 'no-store', signal: AbortSignal.timeout(25000) });
+    const requestBody = ['POST', 'PATCH'].includes(request.method)
+      ? await request.text()
+      : '';
+    const response = await fetch(`${API}/${route}`, {
+      method: request.method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(requestBody ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(requestBody ? { body: requestBody } : {}),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(25000),
+    });
     return new Response(await response.text(), { status: response.status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
   } catch { return Response.json({ message: 'API is unavailable. Check the API server and try again.' }, { status: 503 }); }
 }

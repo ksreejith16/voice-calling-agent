@@ -5,7 +5,7 @@ async function forward(request: Request, context: { params: Promise<{ path: stri
   if (!userId) return Response.json({ message: 'Sign in to continue' }, { status: 401 });
   const { path } = await context.params;
   const route = path.join('/');
-  if (!/^(agents\/[0-9a-f-]{36}|voice-tests\/(agent\/)?[0-9a-f-]{36})$/i.test(route)) return Response.json({ message: 'Not found' }, { status: 404 });
+  if (!/^(agents\/[0-9a-f-]{36}|campaigns\/[0-9a-f-]{36}|leads\/[0-9a-f-]{36}|voice-tests\/(agent\/)?[0-9a-f-]{36})$/i.test(route)) return Response.json({ message: 'Not found' }, { status: 404 });
   if (!['GET','HEAD'].includes(request.method) && request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ message: 'Invalid origin' }, { status: 403 });
   try {
     const token = await getToken();

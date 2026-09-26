@@ -21,6 +21,16 @@ export async function createApp(
     allowedHeaders: ['Authorization', 'Content-Type'],
     credentials: false,
   });
+  // Capture raw body before JSON parsing so Razorpay webhook HMAC can be verified.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (app.getHttpAdapter().getInstance() as any).addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (req: Record<string, unknown>, body: string, done: (err: Error | null, body?: unknown) => void) => {
+      req['rawBody'] = body;
+      try { done(null, JSON.parse(body || '{}')); } catch (e) { done(e as Error); }
+    },
+  );
   app.enableShutdownHooks();
   await app.init();
   await app.getHttpAdapter().getInstance().ready();

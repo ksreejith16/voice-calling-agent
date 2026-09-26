@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getCalls } from "../../../../lib/api";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -12,25 +13,40 @@ function Duration({ seconds }: { seconds: number | null }) {
   return <span>{m > 0 ? `${m}m ` : ""}{s}s</span>;
 }
 
-export default async function CallsPage() {
+export default async function CallsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ campaignId?: string; leadId?: string }>;
+}) {
+  const { campaignId, leadId } = await searchParams;
   let calls;
-  try { calls = await getCalls(); } catch { calls = null; }
+  try { calls = await getCalls({ campaignId, leadId }); } catch { calls = null; }
 
   return (
     <div className="dash-page">
       <div className="dash-page-header">
         <h1>Calls</h1>
-        <span className="dash-page-sub">Call history and outcomes</span>
+        <span className="dash-page-sub">
+          {leadId ? "Filtered by lead" : campaignId ? "Filtered by campaign" : "All call history"}
+        </span>
       </div>
+
+      {(leadId || campaignId) && (
+        <div className="dash-notice">
+          {leadId && <>Showing calls for lead <code>{leadId}</code>.{" "}</>}
+          {campaignId && <>Showing calls for campaign <code>{campaignId}</code>.{" "}</>}
+          <Link href="/dashboard/calls" className="dash-link">Clear filter</Link>
+        </div>
+      )}
 
       {!calls || calls.length === 0 ? (
         <div className="dash-empty">
           <div className="dash-empty-icon">◑</div>
-          <h2>No calls yet</h2>
+          <h2>No calls{leadId || campaignId ? " found" : " yet"}</h2>
           <p>
-            Call history will appear here once your campaigns start making calls.
-            Telephone integration (Exotel) is a future milestone — the current prototype
-            uses the browser voice harness.
+            {leadId || campaignId
+              ? "No calls match the current filter."
+              : "Call history will appear here once campaigns start making calls. Telephony integration (Exotel) is pending."}
           </p>
         </div>
       ) : (
@@ -38,18 +54,20 @@ export default async function CallsPage() {
           <table className="dash-table">
             <thead>
               <tr>
-                <th>Status</th><th>Duration</th><th>Charge</th>
-                <th>Settlement</th><th>Ended</th>
+                <th>Status</th><th>Attempt</th><th>Duration</th>
+                <th>Charge</th><th>Error</th><th>Queued</th><th></th>
               </tr>
             </thead>
             <tbody>
               {calls.map((c) => (
                 <tr key={c.id}>
                   <td><span className={`badge ${STATUS_COLORS[c.status] ?? "badge--gray"}`}>{c.status}</span></td>
+                  <td>#{c.attemptNumber}</td>
                   <td><Duration seconds={c.connectedDurationSeconds} /></td>
                   <td>₹{(Number(c.chargedPaise) / 100).toFixed(2)}</td>
-                  <td>{c.endedAt ? new Date(c.endedAt).toLocaleDateString("en-IN") : <span className="muted">—</span>}</td>
-                  <td>{c.endedAt ? new Date(c.endedAt).toLocaleTimeString("en-IN") : ""}</td>
+                  <td>{c.errorCode ? <code style={{ fontSize: "0.75rem" }}>{c.errorCode}</code> : <span className="muted">—</span>}</td>
+                  <td>{c.queuedAt ? new Date(c.queuedAt).toLocaleString("en-IN") : <span className="muted">—</span>}</td>
+                  <td><Link href={`/dashboard/calls/${c.id}`} className="dash-link">Details</Link></td>
                 </tr>
               ))}
             </tbody>

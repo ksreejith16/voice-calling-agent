@@ -1,4 +1,5 @@
 import { getWallet, getTransactions } from "../../../../lib/api";
+import TopupForm from "./topup-form";
 
 export default async function WalletPage() {
   let wallet, transactions;
@@ -26,16 +27,15 @@ export default async function WalletPage() {
               Posted: ₹{(Number(wallet.balancePaise) / 100).toFixed(2)} · Reserved: ₹{(Number(wallet.reservedPaise) / 100).toFixed(2)}
             </div>
           </div>
-          <div className="dash-notice dash-notice--info">
-            Top-up via Razorpay is planned for Milestone 4. To add test funds, contact support or use the admin database tool.
-          </div>
         </div>
       ) : (
         <div className="dash-notice dash-notice--warn">Could not load wallet. Ensure the API is running.</div>
       )}
 
+      <TopupForm />
+
       <section className="dash-section">
-        <h2 className="dash-section-title">Transactions</h2>
+        <h2 className="dash-section-title">Transaction history</h2>
         {!transactions || transactions.length === 0 ? (
           <div className="dash-empty">
             <p>No transactions yet. Top-up or call charges will appear here.</p>

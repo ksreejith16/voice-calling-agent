@@ -106,13 +106,41 @@ export class DashboardController {
 
   @Get('integrations')
   async integrations(@CurrentUser() _user: AuthenticatedUser) {
+    const livekitOk = !!this.config.LIVEKIT_URL && !!this.config.LIVEKIT_API_KEY && !!this.config.LIVEKIT_API_SECRET;
+    const razorpayOk = !!this.config.RAZORPAY_KEY_ID && !!this.config.RAZORPAY_KEY_SECRET;
+    const razorpayWebhookOk = razorpayOk && !!this.config.RAZORPAY_WEBHOOK_SECRET;
+    const voiceEnabled = this.config.VOICE_TEST_ENABLED === 'true';
     return {
-      sarvam: { status: 'not_verified', label: 'Sarvam AI (STT + TTS)', note: 'Add SARVAM_API_KEY to .env and test voice' },
-      livekit: { status: 'not_verified', label: 'LiveKit', note: 'Running locally; configure cloud instance for production' },
-      groq: { status: 'not_verified', label: 'Groq LLM', note: 'Add LLM_API_KEY, LLM_MODEL to .env' },
-      razorpay: { status: 'not_configured', label: 'Razorpay Payments', note: 'Milestone 4 — not yet implemented' },
-      exotel: { status: 'not_configured', label: 'Exotel Telephony', note: 'Milestone 5 — verify account capabilities first' },
-      whatsapp: { status: 'not_configured', label: 'WhatsApp (Meta Cloud API)', note: 'Milestone 8 — not yet implemented' },
+      sarvam: {
+        status: voiceEnabled ? 'configured' : 'not_verified',
+        label: 'Sarvam AI (STT + TTS)',
+        note: voiceEnabled ? 'VOICE_TEST_ENABLED=true; STT+TTS active in browser tests. Live call verification pending.' : 'Set VOICE_TEST_ENABLED=true and test an agent voice session.',
+      },
+      livekit: {
+        status: livekitOk ? 'configured' : 'not_configured',
+        label: 'LiveKit (voice sessions)',
+        note: livekitOk ? 'Credentials present. Running locally — configure cloud URL for production.' : 'Set LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET in .env.',
+      },
+      groq: {
+        status: 'not_verified',
+        label: 'Groq LLM',
+        note: 'LLM is configured via voice worker .env. Live call verification pending.',
+      },
+      razorpay: {
+        status: razorpayWebhookOk ? 'configured' : razorpayOk ? 'needs_attention' : 'not_configured',
+        label: 'Razorpay Payments',
+        note: razorpayWebhookOk ? 'Key, secret, and webhook secret configured. Sandbox verification pending.' : razorpayOk ? 'Missing RAZORPAY_WEBHOOK_SECRET — webhook verification disabled.' : 'Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET to .env.',
+      },
+      exotel: {
+        status: 'not_configured',
+        label: 'Exotel PSTN Telephony',
+        note: 'Requires account capability verification (SIP/media streaming to LiveKit) before implementation.',
+      },
+      whatsapp: {
+        status: 'not_configured',
+        label: 'WhatsApp (Meta Cloud API)',
+        note: 'Planned for Milestone 8 — not yet implemented.',
+      },
     };
   }
 }

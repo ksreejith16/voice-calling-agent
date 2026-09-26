@@ -2,7 +2,7 @@
   "name": "india-voice-platform",
   "version": "0.1.0",
   "private": true,
-  "description": "Multi-tenant India voice platform \u00e2\u20ac\u201d Phase 1 foundation",
+  "description": "Multi-tenant India voice platform â€” Phase 1 foundation",
   "engines": {
     "node": ">=22.12.0 <23 || >=24.0.0",
     "npm": ">=10"
@@ -39,6 +39,7 @@
   "allowScripts": {
     "esbuild@0.18.20": true,
     "esbuild@0.25.12": true,
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "msgpackr-extract@3.0.4": true
   }
 }

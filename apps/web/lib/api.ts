@@ -63,6 +63,16 @@ export async function getCampaigns() {
   }>>("/campaigns");
 }
 
+export async function getCampaign(id: string) {
+  return apiFetch<{
+    id: string; name: string; status: string; goal: string; persona: string;
+    language: string; voice: string | null; ratePaisePerMinute: string;
+    billingQuantumSeconds: number; maxConnectedDurationSeconds: number;
+    concurrencyLimit: number; pauseReason: string | null;
+    scheduledAt: string | null; createdAt: string; updatedAt: string;
+  }>(`/campaigns/${id}`);
+}
+
 export async function getLeads(params?: { campaignId?: string; status?: string }) {
   const qs = new URLSearchParams(params as Record<string, string> ?? {}).toString();
   return apiFetch<Array<{
@@ -72,12 +82,41 @@ export async function getLeads(params?: { campaignId?: string; status?: string }
   }>>(`/leads${qs ? `?${qs}` : ""}`);
 }
 
+export async function getLead(id: string) {
+  return apiFetch<{
+    id: string; campaignId: string; phoneE164: string; name: string | null;
+    source: string; externalReference: string | null;
+    status: string; qualification: string | null; qualificationScore: number | null;
+    attemptCount: number; nextAttemptAt: string | null; lastAttemptAt: string | null;
+    lastOutcome: string | null; consentEvidence: Record<string, unknown>;
+    attributes: Record<string, unknown>; createdAt: string; updatedAt: string;
+  }>(`/leads/${id}`);
+}
+
 export async function getCalls(params?: { campaignId?: string; leadId?: string }) {
   const qs = new URLSearchParams(params as Record<string, string> ?? {}).toString();
   return apiFetch<Array<{
     id: string; campaignId: string; leadId: string; status: string;
-    connectedDurationSeconds: number | null; chargedPaise: string; endedAt: string | null;
+    attemptNumber: number; connectedDurationSeconds: number | null;
+    chargedPaise: string; settlementStatus: string;
+    queuedAt: string | null; connectedAt: string | null; endedAt: string | null;
+    errorCode: string | null;
   }>>(`/calls${qs ? `?${qs}` : ""}`);
+}
+
+export async function getCall(id: string) {
+  return apiFetch<{
+    id: string; campaignId: string; leadId: string; walletId: string;
+    attemptNumber: number; provider: string | null; providerCallId: string | null;
+    status: string; queuedAt: string; startedAt: string | null;
+    connectedAt: string | null; endedAt: string | null;
+    connectedDurationSeconds: number | null; billableSeconds: number;
+    ratePaisePerMinute: string; billingQuantumSeconds: number;
+    maxConnectedDurationSeconds: number; chargedPaise: string;
+    settlementStatus: string; settledAt: string | null;
+    errorCode: string | null; recordingConsentGranted: boolean;
+    createdAt: string; updatedAt: string;
+  }>(`/calls/${id}`);
 }
 
 export async function getWallet() {

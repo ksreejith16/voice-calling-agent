@@ -137,6 +137,8 @@
 .dash-btn--secondary:hover{background:#f4f5f8}
 .dash-link{color:var(--blue);font-size:12px;font-weight:500}
 .dash-link:hover{text-decoration:underline}
+.dash-btn:disabled{opacity:.55;cursor:not-allowed}
+.dash-btn:not(:disabled){cursor:pointer}
 
 /* Table */
 .dash-table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--line);background:#fff}
@@ -212,3 +214,11 @@
 .form-textarea{resize:vertical;min-height:80px}
 .form-hint{font-size:11px;color:var(--muted);margin-top:5px}
 .form-actions{display:flex;gap:12px;margin-top:8px;padding-top:20px;border-top:1px solid var(--line)}
+
+
+/* ── Detail pages ─────────────────────────────────────────────────────── */
+.dash-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:24px 28px;margin-top:24px}
+.dash-card h2{font-size:15px;font-weight:700;margin-bottom:16px;color:var(--ink)}
+.detail-grid{display:grid;grid-template-columns:180px 1fr;gap:10px 20px;margin:0}
+.detail-grid dt{font-size:12px;font-weight:600;color:#4e5968;padding-top:2px}
+.detail-grid dd{font-size:13px;color:var(--ink);margin:0}

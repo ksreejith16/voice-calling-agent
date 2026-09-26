@@ -15,6 +15,7 @@ import { LeadsController } from './leads/leads.controller';
 import { CallLogsController } from './call-logs/call-logs.controller';
 import { WalletController } from './wallet/wallet.controller';
 import { DashboardController } from './dashboard/dashboard.controller';
+import { createCampaignWorker } from './queue/campaign.queue';
 
 @Controller()
 class HealthController {
@@ -69,6 +70,11 @@ export class AppModule {
         },
         { provide: APP_CONFIG, useValue: config },
         ClerkAuthGuard,
+        {
+          provide: 'CAMPAIGN_WORKER',
+          useFactory: (db: ReturnType<Infrastructure['getDb']>) => createCampaignWorker(config.REDIS_URL, db),
+          inject: [DATABASE],
+        },
       ],
     };
   }

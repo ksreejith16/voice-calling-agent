@@ -310,6 +310,30 @@ export const agentConfigs = pgTable('agent_configs', {
 ]);
 
 // Browser tests are deliberately separate from billable telephone call records.
+export const paymentOrderStatus = pgEnum('payment_order_status', ['created', 'paid', 'failed', 'expired', 'refunded']);
+
+export const paymentOrders = pgTable('payment_orders', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: tenantId(),
+  razorpayOrderId: varchar('razorpay_order_id', { length: 200 }).notNull().unique(),
+  amountPaise: bigint('amount_paise', { mode: 'bigint' }).notNull(),
+  currency: varchar('currency', { length: 3 }).notNull().default('INR'),
+  status: paymentOrderStatus('status').notNull().default('created'),
+  idempotencyKey: varchar('idempotency_key', { length: 200 }).notNull(),
+  razorpayPaymentId: varchar('razorpay_payment_id', { length: 200 }),
+  razorpaySignature: varchar('razorpay_signature', { length: 500 }),
+  creditedAt: timestamp('credited_at', { withTimezone: true }),
+  failedReason: varchar('failed_reason', { length: 200 }),
+  ...auditColumns(),
+}, (table) => [
+  unique('payment_orders_org_id_unique').on(table.organizationId, table.id),
+  unique('payment_orders_org_idem_unique').on(table.organizationId, table.idempotencyKey),
+  index('payment_orders_org_status_idx').on(table.organizationId, table.status),
+  check('payment_orders_amount_positive', sql`${table.amountPaise} > 0 AND ${table.amountPaise} <= 100000000`),
+  check('payment_orders_currency_inr', sql`${table.currency} = 'INR'`),
+  check('payment_orders_credited_consistent', sql`(${table.status} = 'paid') = (${table.creditedAt} IS NOT NULL)`),
+]);
+
 export const voiceTestSessions = pgTable('voice_test_sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: tenantId(),
